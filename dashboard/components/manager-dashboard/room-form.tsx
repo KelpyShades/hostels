@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import type { DemoRoom } from "./types";
+import type { ManagerRoom } from "./types";
 
 const roomSchema = z.object({ price: z.coerce.number().int().positive(), available: z.coerce.number().int().nonnegative(), accepting: z.enum(["open", "closed"]) });
 
-export function RoomForm({ room, onSave }: { room: DemoRoom; onSave: (values: { price: number; available: number; accepting: boolean }) => Promise<void> | void }) {
+export function RoomForm({ room, onSave }: { room: ManagerRoom; onSave: (values: { price: number; available: number; accepting: boolean }) => Promise<void> | void }) {
   const [price, setPrice] = useState(String(room.pricePerSemester));
   const [available, setAvailable] = useState(String(room.availableCount));
   const [accepting, setAccepting] = useState(room.accepting ? "open" : "closed");

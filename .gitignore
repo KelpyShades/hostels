@@ -38,3 +38,5 @@ yarn-error.log*
 
 # scratch
 _temp/
+dashboard/node_modules/
+landing_page/node_modules/

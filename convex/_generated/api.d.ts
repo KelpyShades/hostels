@@ -8,8 +8,7 @@
  * @module
  */
 
-import type * as dashboard from "../dashboard.js";
-import type * as r2 from "../r2.js";
+import type * as manager from "../manager.js";
 
 import type {
   ApiFromModules,
@@ -18,8 +17,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
-  dashboard: typeof dashboard;
-  r2: typeof r2;
+  manager: typeof manager;
 }>;
 
 /**

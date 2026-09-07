@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Hotel app — hostel/",
-  description: "Internal hostel client management workspace.",
+  title: "Hostel manager dashboard",
+  description: "Manage inquiries and room availability for your hostel.",
   robots: { index: false, follow: false },
 };
 

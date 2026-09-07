@@ -15,43 +15,42 @@ const assetKind = v.union(v.literal("hero"), v.literal("gallery"), v.literal("ro
 
 export default defineSchema({
   hostels: defineTable({
+    // Identity — the only fields needed to draft a hostel row.
     name: v.string(),
-    slug: v.string(),
-    customDomain: v.optional(v.string()),
     mode: hostelMode,
-    whatsappNumber: v.string(),
-    momoName: v.string(),
-    momoNumber: v.string(),
-    bookingFee: v.number(),
-    tagline: v.string(),
-    aboutCopy: v.string(),
-    directions: v.string(),
-    mapQuery: v.string(),
     status: hostelStatus,
-    seoTitle: v.string(),
-    seoDescription: v.string(),
+    // Everything below is optional so a draft can be created in the Convex
+    // dashboard with just name + mode + status, then filled in later.
+    customDomain: v.optional(v.string()),
+    whatsappNumber: v.optional(v.string()),
+    momoName: v.optional(v.string()),
+    momoNumber: v.optional(v.string()),
+    bookingFee: v.optional(v.number()),
+    tagline: v.optional(v.string()),
+    aboutCopy: v.optional(v.string()),
+    directions: v.optional(v.string()),
+    mapQuery: v.optional(v.string()),
+    seoTitle: v.optional(v.string()),
+    seoDescription: v.optional(v.string()),
     renewalDate: v.optional(v.string()),
-    theme: v.object({
-      background: v.string(),
-      foreground: v.string(),
-      accent: v.string(),
-    }),
-  })
-    .index("by_slug", ["slug"])
-    .index("by_status", ["status"]),
+    theme: v.optional(
+      v.object({
+        background: v.string(),
+        foreground: v.string(),
+        accent: v.string(),
+      }),
+    ),
+  }).index("by_status", ["status"]),
 
   branches: defineTable({
     hostelId: v.id("hostels"),
     name: v.string(),
-    slug: v.string(),
+    slug: v.optional(v.string()),
     whatsappNumber: v.optional(v.string()),
     directions: v.optional(v.string()),
-    directionsNote: v.string(),
-    inboxToken: v.string(),
+    directionsNote: v.optional(v.string()),
     sortOrder: v.number(),
-  })
-    .index("by_hostel", ["hostelId"])
-    .index("by_hostel_and_slug", ["hostelId", "slug"]),
+  }).index("by_hostel", ["hostelId"]),
 
   rooms: defineTable({
     branchId: v.id("branches"),
@@ -62,7 +61,7 @@ export default defineSchema({
     pricePerSemester: v.number(),
     availableCount: v.number(),
     accepting: v.boolean(),
-    amenities: v.array(v.string()),
+    amenities: v.optional(v.array(v.string())),
     photoKey: v.optional(v.string()),
     sortOrder: v.number(),
   })

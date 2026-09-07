@@ -3,10 +3,23 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+type TabsProps = {
+  defaultValue?: string;
+  value?: string;
+  onValueChange?: (value: string) => void;
+  children: React.ReactNode;
+  className?: string;
+};
+
 const TabsContext = React.createContext<{ value: string; setValue: (value: string) => void } | null>(null);
 
-export function Tabs({ defaultValue, children, className }: { defaultValue: string; children: React.ReactNode; className?: string }) {
-  const [value, setValue] = React.useState(defaultValue);
+export function Tabs({ defaultValue, value: controlledValue, onValueChange, children, className }: TabsProps) {
+  const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue ?? "");
+  const value = controlledValue ?? uncontrolledValue;
+  const setValue = (nextValue: string) => {
+    if (controlledValue === undefined) setUncontrolledValue(nextValue);
+    onValueChange?.(nextValue);
+  };
   return <TabsContext.Provider value={{ value, setValue }}><div className={className}>{children}</div></TabsContext.Provider>;
 }
 export function TabsList({ children, className }: React.HTMLAttributes<HTMLDivElement>) {

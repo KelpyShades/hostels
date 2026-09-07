@@ -38,11 +38,11 @@ A **reusable hostel microsite product** for Ghanaian university hostels. One cod
 | Actor | Access | What they do |
 |---|---|---|
 | **Student (visitor)** | Public site | Looks at rooms, photos, prices; submits an inquiry that opens a pre-filled WhatsApp chat |
-| **Hostel owner / on-site staff** | Private link (unguessable URL, no login) | Views inquiries; marks them contacted/booked; edits room price + availability only |
-| **Hostel manager** (multi-branch hostels) | Rollup private link | Same inbox view across all branches of their hostel |
-| **Us (404notnull / Kelvin)** | Internal tool (token-gated) | Onboards clients, swaps photos/copy, flips statuses, sees activity across all clients, manually redirects leads between sister branches |
+| **Hostel owner / on-site staff** | Their hostel dashboard domain (no login in v1) | Views inquiries; marks them contacted/booked; edits room price + availability only |
+| **Hostel manager** (multi-branch hostels) | Their hostel dashboard domain (no login in v1) | Same inbox view across all branches of their hostel |
+| **Us (404notnull / Kelvin)** | Separate internal tool (token-gated, later) | Onboards clients, swaps photos/copy, flips statuses, sees activity across all clients, manually redirects leads between sister branches |
 
-**Zero authentication surface for clients.** No usernames, no passwords, no password resets, no auth library (no Clerk, nothing). "Private link" ≠ "account." The only gate anywhere is our own internal tool token.
+**No manager authentication in v1.** Each hostel gets its own separately deployed manager dashboard, selected by `HOSTEL_ID` (the Convex hostels row `_id`), and its normal dashboard domain opens the manager experience directly at `/`. The dashboard contains the manager's Inbox and Rooms views; they are nested inside the base app rather than separate products. A simple login can be added later; when it is, `/` becomes the login gate and `/app` becomes the authenticated dashboard. The internal operator tool is a separate product and is deferred.
 
 ---
 
@@ -69,15 +69,15 @@ The core principle, extended to infrastructure: **N clients is N database rows, 
                           worker (if needed)
 ```
 
-**Deployment model: one build, deployed N times on Vercel.** Each hostel is its own Vercel project from this same repo, selected by a `HOSTEL_SLUG` env var — free `*.vercel.app` URL until they buy their domain, then the custom domain attaches to their project. Deploying a release = promote the same build across the projects. One client's outage never touches another's site.
+**Deployment model: separate public and manager projects per hostel.** `landing_page` is the public hostel site. `dashboard` is the owner/manager app. Both are deployed per hostel and point at the same Convex deployment; `HOSTEL_ID` (the hostels row `_id`) selects the hostel for the dashboard deployment. The dashboard domain is the manager's normal hosting domain for v1. Authentication can be added later without changing the manager's internal routes: `/` becomes the gate and `/app` becomes the dashboard.
 
 > **Cost note:** Vercel's free Hobby tier prohibits commercial projects — client hostel sites require the Pro plan (or the risk is accepted knowingly). Convex and R2 stay on their generous free tiers.
 
 **The hostel is the client unit — never the branch.** A hostel is a single place by default; some hostels have branches. Both kinds are one hostel record with a `mode` field (`'unit' | 'multi'`). Implementation detail: a unit hostel is stored with exactly one implicit branch so rooms always belong to exactly one location and there's a single query shape — but the *product* language and UI only ever say "hostel," and the mode only decides whether a branch picker appears.
 
-**Surface placement:** each hostel project carries its public site and its own `/inbox/<token>` owner link. The internal tool (ours) is a separate small project against the same Convex — built later, when there's real client data.
+**Surface placement:** `landing_page` carries the public site. `dashboard` is a separate per-hostel deployment for the owner/manager and opens directly at its base route. The internal tool (ours) is a separate small project against the same Convex — built later, when there's real client data.
 
-- **One Vercel project per hostel.** Each project serves exactly one hostel, selected by env — the domain is never a reason to fork infrastructure. Vercel auto-issues SSL per custom domain.
+- **Separate public and dashboard projects per hostel.** The public deployment serves the student-facing site. The dashboard deployment serves the owner/manager app and uses `HOSTEL_ID` to bind itself to one hostel.
 - **One Convex project.** Multi-branch orgs are a foreign key, not a fork.
 - **One R2 bucket.** Keys namespaced `hostels/{branchId}/room-1.jpg`. Never a bucket per client.
 
@@ -86,17 +86,9 @@ The core principle, extended to infrastructure: **N clients is N database rows, 
 ```
 hostel/                        ← one repo; one build deployed per hostel
 ├── SPEC.md                    ← this file
-├── app/
-│   ├── page.tsx               # hostel entry (unit: the whole site; multi: branch picker)
-│   ├── b/[branch]/page.tsx    # branch site (multi-branch hostels)
-│   ├── inbox/[token]/         # owner private link (noindex, ships with each deployment)
-│   ├── qr/route.tsx           # QR code image for flyers
-│   └── api/                   # route handlers (inquiry submit)
-├── components/                # shared UI (per-hostel themed)
-├── lib/                       # data access, content types, wa.me builder
-├── convex/                    # schema, queries, mutations (wired post-demo)
-├── public/mock/               # mockup imagery (replaced by R2 in production)
-└── wrangler / open-next config
+├── landing_page/              # public student-facing hostel site
+├── dashboard/                 # owner/manager dashboard, root route is the app
+├── convex/                    # shared schema, queries, mutations, R2 component
 ```
 
 (The internal tool is a separate deployment — its own small app against the same Convex.)
@@ -107,25 +99,29 @@ hostel/                        ← one repo; one build deployed per hostel
 
 ```
 hostels                        ← the client unit: one hostel (single or multi-branch)
-  name, slug, customDomain
-  mode                         ← 'unit' | 'multi' — demo: manual value in mock file; prod: record field
-  whatsappNumber               ← E.164, e.g. +233…
-  momoName, momoNumber, bookingFee
-  tagline, aboutCopy           ← owner's own voice, curated by us
-  directions                   ← how to get there (landmarks, campus distance)
-  heroImages[], gallery[]      ← R2 keys
+  name                         ← required — draft a row with just name + mode + status
+  mode                         ← 'unit' | 'multi' (required)
+  status                       ← draft | live | paused (required)
+  customDomain?                ← everything below is optional; fill in before going live
+  whatsappNumber?              ← E.164, e.g. +233…
+  momoName?, momoNumber?, bookingFee?
+  tagline?, aboutCopy?         ← owner's own voice, curated by us
+  directions?, mapQuery?
+  heroImages[], gallery[]      ← R2 keys (asset rows, not inline)
   testimonials[]               ← { name, program/year, quote, photoKey? }
-  theme                        ← palette tokens (see §7.4)
-  inboxToken                   ← unit hostels: the owner's key lives here
-  status                       ← draft | live | paused
-  seo: { title, description }
+  theme?                       ← palette tokens (see §7.4)
+  renewalDate?
+  seo: { title, description }?
+
+  Binding: each deployment selects its hostel by the row's `_id` via the
+  HOSTEL_ID env var — no slug field, no lookup by name.
 
 branches                       ← multi-branch hostels (unit hostels have one implicit record)
-  hostelId                     ← FK
-  name, slug
+  hostelId                     ← FK (required)
+  name                         ← required
+  slug?                        ← optional; only for /b/[branch] public routing
   whatsappNumber?, directions? ← branch-level overrides where they differ
-  directionsNote               ← "8 min walk to the main gate" style, per branch
-  inboxToken                   ← per-branch owner link (on-site staff)
+  directionsNote?              ← "8 min walk to the main gate" style, per branch
   sortOrder
 
 rooms
@@ -137,8 +133,8 @@ rooms
   pricePerSemester             ← GHS, integer
   availableCount               ← integer, owner-editable
   accepting                    ← boolean (the in/out toggle), owner-editable
-  amenities[]                  ← subset of amenity taxonomy
-  photoKey                     ← R2 key
+  amenities?                   ← optional; subset of amenity taxonomy
+  photoKey?                    ← R2 key
   sortOrder
 
 inquiries
@@ -158,15 +154,29 @@ roomChangeLog                  ← ours, not exposed to owners
 **Validation invariants** (enforced in Convex mutations, not just the UI):
 - `pricePerSemester` must be a positive integer; cannot be set to 0 or blanked.
 - `name` and `occupancy` cannot be blanked by an owner edit.
-- Every owner-facing mutation takes the branch `inboxToken` and rejects on mismatch — the token is the only capability check needed.
+- Every manager mutation takes the deployment's `HOSTEL_ID` and verifies the room/inquiry belongs to that hostel before writing — the deployment binding is the capability check in v1.
 
 ---
 
 ## 6. Routing, domains, hosting
 
-### 6.1 The two modes and their routes
+The public site and manager dashboard are separate deployments for each hostel. Their current v1 routes are:
 
-Each hostel is its own deployment, so **the root is the hostel** — no shared-domain prefix anywhere:
+**Public site (`landing_page`):**
+```
+/                 → public hostel site
+/b/[branch]       → branch site for multi-branch hostels
+/qr              → flyer QR route
+```
+
+**Manager dashboard (`dashboard`):**
+```
+/                 → manager dashboard for the `HOSTEL_ID` deployment
+                  ├── Inbox view
+                  └── Rooms & availability view
+```
+
+Inbox and Rooms are nested views inside the base dashboard page, not separate public products or access links. Authentication is deliberately deferred. When added later, `/` can become the login gate and `/app` can become the authenticated dashboard.
 
 **Unit hostel (the default — a hostel is just that hostel):**
 ```
@@ -185,8 +195,8 @@ examplehostel.com/           (or example-hostel.vercel.app)
 ```
 
 - **Mode is data, not a code fork.** For the demo it's a manual value in the mock file (`mode: 'unit' | 'multi'` — the bool Kelvin flips in code). In production it's a field on the hostel record. The page tree is shared; the mode only decides whether the branch picker renders.
-- **Which hostel this project serves:** the `HOSTEL_SLUG` env var (dev default: the demo hostel). Custom domain and the free vercel.app URL both point at the same project.
-- **`/b/` namespace for branches** keeps branch slugs clear of the app's own routes (`/inbox`, `/qr`, `robots.txt`).
+- **Which hostel this project serves:** the `HOSTEL_ID` env var (the hostels row `_id`; dev default: the demo hostel). Custom domain and the free vercel.app URL both point at the same project.
+- **`/b/` namespace for branches** keeps branch slugs clear of the app's own routes (`/qr`, `robots.txt`).
 
 ### 6.2 404 behavior (wrong ones)
 
@@ -198,7 +208,7 @@ examplehostel.com/           (or example-hostel.vercel.app)
 
 ### 6.3 Hosting & rendering
 
-- **Hosting:** Vercel — one project per hostel, same codebase, `HOSTEL_SLUG` env var selects the hostel. Free `*.vercel.app` URL until the client's custom domain attaches. **Cloudflare stays in the stack only for storage:** the shared R2 bucket (namespaced per hostel) and, if needed, one shared image-processing worker that all deployments point at. Convex remains the single backend for every deployment.
+- **Hosting:** Vercel — one project per hostel, same codebase, `HOSTEL_ID` env var selects the hostel. Free `*.vercel.app` URL until the client's custom domain attaches. **Cloudflare stays in the stack only for storage:** the shared R2 bucket (namespaced per hostel) and, if needed, one shared image-processing worker that all deployments point at. Convex remains the single backend for every deployment.
 - **Dev/demo:** `pnpm dev` — `localhost:3000` is the hostel (demo default: Aseda Heights).
 - **Rendering:** page shells (copy, photos, testimonials, about) are statically generated — content changes only at annual refresh, so build-time rendering gives fast pages, good SEO, near-zero cost. Room price + availability are the exception: they go stale fast, so they render client-side via Convex reactive queries (§7.5).
 
@@ -241,9 +251,9 @@ examplehostel.com/           (or example-hostel.vercel.app)
 
 ### 7.2 Surface B — Owner private link
 
-**FR-B1 · The link.** `…/inbox/<uuid-v4>`. No login, no password. Bookmarked once. The UUID must be genuinely unguessable — never a slug or sequential ID.
+**FR-B1 · The dashboard.** The owner's normal dashboard domain opens directly at `/`. In v1 there is no login or password; the dashboard deployment is selected for that hostel with `HOSTEL_ID` (the hostels row `_id`). The base app contains the Inbox and Rooms views. If authentication is added later, `/` becomes the gate and `/app` becomes the authenticated dashboard.
 
-**FR-B2 · Security hygiene.** Page is `noindex`, `nofollow`, excluded from sitemap, disallowed in `robots.txt`. It exposes real lead data — a crawled/cached copy would be a real leak. Link invalidation = regenerating the token (we do it, on request or on suspicion).
+**FR-B2 · Security hygiene.** The dashboard is `noindex`, `nofollow`, excluded from any sitemap, and disallowed in `robots.txt` while authentication is deferred. It exposes real lead data. The dashboard hostname is the access boundary in v1; when authentication is added, access control must be enforced before rendering the dashboard.
 
 **FR-B3 · Inbox tab.** Chronological inquiry list: who, phone, room wanted, when, message. Status badges: new / contacted / booked. Toggle updates the inquiry row.
 
@@ -251,7 +261,7 @@ examplehostel.com/           (or example-hostel.vercel.app)
 
 **FR-B5 · Everything else is ours.** Photos, testimonials, copy, theming: annual refresh, done by us. The pitch line this enables: *"You control day-to-day pricing and availability yourself; I keep the site looking sharp once a year."*
 
-**FR-B6 · Hostel-level rollup (multi-branch hostels).** Same mechanism, hostel-scope query: one link showing all branches' inquiries for the manager, alongside each branch's own link for on-site staff.
+**FR-B6 · Hostel scope.** Each dashboard deployment is bound to one hostel by `HOSTEL_ID`. A multi-branch manager sees all branches' inquiries and rooms; a unit hostel has one implicit branch. Branch-level dashboard views can be added later if needed.
 
 ### 7.3 Surface C — Internal tool (ours)
 
@@ -324,7 +334,7 @@ Inquiry (WhatsApp) → chat / phone call → visit ("come and see the room") →
 | @hookform/resolvers | 5.9.x | RHF ↔ Zod bridge |
 | qrcode | 1.5.x | Flyer QR generation |
 | ESLint | 10.x flat config | Via `eslint-config-next@16`; `pnpm lint` script |
-| Hosting | Vercel | One project per hostel, `HOSTEL_SLUG` env; Pro tier required for commercial client sites |
+| Hosting | Vercel | One project per hostel, `HOSTEL_ID` env; Pro tier required for commercial client sites |
 | Email receipts | Pingram | Verify current API docs at integration time (also does WhatsApp API — a future premium-tier option may live in the same account) |
 | Analytics | Cloudflare Web Analytics | Free, privacy-friendly, dropped in per page; do not build analytics |
 | Images | R2 + shared image-processing worker | All hostel projects point at the same R2 bucket/worker; serve sized variants, never originals |
@@ -363,10 +373,10 @@ Build order decision: **public page first, then the manager-facing site, then ou
 2. **Scaffold** — pnpm + Next 16 + TS + Tailwind 4 + ESLint, per §9.
 3. **Public site, demo hostel** — the full Aseda Heights page (FR-A0→A13) with hardcoded mock content in a typed `lib/mock-hostel.ts` (same shape as the Convex schema, so swapping to live data later is a data-source change, not a rewrite). Working WhatsApp flow with a test number. Working QR route.
    - **All public-page UI is decided under the huashu-design skill** (`.agents/skills/huashu-design`): 3 differentiated design directions offered before building → junior pass with placeholders → full pass with real photography (never SVG-drawn imagery or CSS silhouettes) → anti-slop checklist applied.
-4. **Owner/manager site** — inbox + rooms tab (Surface B) in mock-data form, so the manager sees both halves of the product in one demo.
-5. **Client demo** — Kelvin shows the public page + the manager views to the first hostel.
+4. **Owner/manager dashboard** — inbox + rooms views (Surface B) in the separate `dashboard` app, scoped to the deployment's `HOSTEL_ID`.
+5. **Client demo** — Kelvin shows the public page + the manager dashboard to the first hostel.
 6. On acceptance: **Convex wiring** (schema, real hostel, real content, R2 uploads), Pingram receipt email.
-7. **Internal tool** (Surface C) — ours, built when there's real client data to manage.
+7. **Internal tool (Surface C)** — ours, built later when there is real client data to manage.
 
 The mockup must be a real running build — the demo has to *feel* like their future website, which a static image can't do.
 
@@ -389,6 +399,6 @@ The mockup must be a real running build — the demo has to *feel* like their fu
 - **Public site:** `pnpm dev` → `localhost:3000` — walkthrough of every FR-A item on a phone-sized viewport; WhatsApp button opens a correctly pre-filled chat (test number); QR scans to the page; Lighthouse mobile pass.
 - **Mode routing:** unit hostel entry shows the full site directly; a branch path on a unit hostel redirects to the hostel home; unknown hostel or branch slug shows the branded 404 (not the default Next 404).
 - **Form:** honeypot submission discarded; valid submission logged + WhatsApp opens with structured message.
-- **Inbox/Rooms (when built):** token URL 404s on wrong token; price edit rejects 0/blank; change log records edits; `noindex` + robots + sitemap exclusion verified.
+- **Inbox/Rooms:** the manager dashboard opens at `/`; the deployment's `HOSTEL_ID` selects exactly one hostel; price edits reject 0/blank; change logs record edits; dashboard is `noindex` + robots-disallowed. Later authentication tests must cover the `/` gate and `/app` dashboard.
 - **Internal tool (when built):** token gate blocks anonymous access; content swap reflects on the public site within a rebuild.
-- **Deploy:** each hostel's Vercel project answers at both its `*.vercel.app` URL and the client's custom domain; SSL auto-issued; `HOSTEL_SLUG` env selects the hostel.
+- **Deploy:** each hostel's Vercel project answers at both its `*.vercel.app` URL and the client's custom domain; SSL auto-issued; `HOSTEL_ID` env selects the hostel.
