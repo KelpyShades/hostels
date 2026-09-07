@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/*
+  Theme tokens — the "Folio" design (2026-09-07).
+  Hotel-folio language: bone paper, forest ink, brass figures, Cormorant
+  display type. Per-hostel theming (FR-A13) swaps these values; components
+  only reference vars, never raw hex.
+
+  CONTRACT — shared components depend on these: --bg, --ink, --ink-soft,
+  --ink-muted, --accent, --accent-contrast, --line, --line-strong,
+  --field-bg, --radius. Extras: --bg-soft, --deep, --deep-ink,
+  --accent-bright, --glass-dark, --brass, --brass-bright, --error.
+
+  Contrast discipline: --ink-muted is ≥4.5:1 on --bg; on dark grounds
+  secondary text is ivory at 55%+ (≥5:1). Brass text appears on --deep
+  only — never on paper, where it fails contrast.
+*/
+
+.dir-folio {
+  --bg: #f3f2ec;
+  --bg-soft: #faf9f4;
+  --deep: #152a20;
+  --deep-ink: #ede9dd;
+  --ink: #1f2420;
+  --ink-soft: #47504a;
+  --ink-muted: #5d665f;
+  --accent: #2e4b3b;
+  --accent-bright: #9fc6ad;
+  --accent-contrast: #f2f0e6;
+  --brass: #b08a4f;
+  --brass-bright: #c9a96a;
+  --glass-dark: rgba(21, 34, 26, 0.55);
+  --line: #e2dfd4;
+  --line-strong: #cfc9ba;
+  --field-bg: #ffffff;
+  --error: #a63d2a;
+  --radius: 2px;
+}
+
+body {
+  background: var(--bg, #ffffff);
+  color: var(--ink, #171717);
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Anchor navigation ("Check availability" → #inquire) — native smooth scroll */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Taste detail (huashu): finer text wrapping where supported */
+p,
+li,
+figcaption,
+blockquote {
+  text-wrap: pretty;
+}
+
+::selection {
+  background: var(--deep, #152a20);
+  color: var(--deep-ink, #ede9dd);
+}
+
+/* Keyboard focus — brass ring on interactive chrome. Text inputs use a
+   border-color focus instead (they're excluded here on purpose). */
+.dir-folio :is(a, button, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--brass, #b08a4f);
+  outline-offset: 3px;
+}
+
+/* Reduced motion: Reveal content shows immediately, no transition.
+   Unlayered rules beat Tailwind's layered utilities — no !important needed. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+}
