@@ -39,7 +39,8 @@ A **reusable hostel microsite product** for Ghanaian university hostels. One cod
 |---|---|---|
 | **Student (visitor)** | Public site | Looks at rooms, photos, prices; submits an inquiry that opens a pre-filled WhatsApp chat |
 | **Hostel owner / on-site staff** | Their hostel dashboard domain (no login in v1) | Views inquiries; marks them contacted/booked; edits room price + availability only |
-| **Hostel manager** (multi-branch hostels) | Their hostel dashboard domain (no login in v1) | Same inbox view across all branches of their hostel |
+| **Hostel manager** (multi-branch hostels) | Their hostel dashboard domain (no login in v1) | Same inbox view across all branches of their hostel — with a branch switcher to focus on one |
+| **Branch caretaker** (multi-branch hostels, e.g. Franco) | Their own branch-locked dashboard deployment (`NEXT_PUBLIC_BRANCH_ID`) | Sees only their branch: its enquiries, its rooms, its share link (FR-B6a) |
 | **Us (404notnull / Kelvin)** | Separate internal tool (token-gated, later) | Onboards clients, swaps photos/copy, flips statuses, sees activity across all clients, manually redirects leads between sister branches |
 
 **No manager authentication in v1.** Each hostel gets its own separately deployed manager dashboard, selected by `HOSTEL_ID` (the Convex hostels row `_id`), and its normal dashboard domain opens the manager experience directly at `/`. The dashboard contains the manager's Inbox and Rooms views; they are nested inside the base app rather than separate products. A simple login can be added later; when it is, `/` becomes the login gate and `/app` becomes the authenticated dashboard. The internal operator tool is a separate product and is deferred.
@@ -59,19 +60,17 @@ The core principle, extended to infrastructure: **N clients is N database rows, 
 │                                 │  Vercel project    │
 │  sisterhostel.com ─────────────┤                    │
 │  sister-hostel.vercel.app ─────┘→ its own project    │
-└──────────────┬───────────────────────────────────────┘
-               │
-     ┌─────────┴─────────┐
-     ▼                   ▼
- ONE Convex deployment   ONE Cloudflare R2 bucket
- (hostel→branch→room/    hostels/{hostelId}/…
-  inquiry rows)          + one shared image-processing
-                          worker (if needed)
+└────────────────┬───────────────────────────────────────┘
+                 │
+                 ▼
+     ONE Convex deployment
+     (hostel→branch→room/
+      inquiry rows)
 ```
 
 **Deployment model: separate public and manager projects per hostel.** `landing_page` is the public hostel site. `dashboard` is the owner/manager app. Both are deployed per hostel and point at the same Convex deployment; `HOSTEL_ID` (the hostels row `_id`) selects the hostel for the dashboard deployment. The dashboard domain is the manager's normal hosting domain for v1. Authentication can be added later without changing the manager's internal routes: `/` becomes the gate and `/app` becomes the dashboard.
 
-> **Cost note:** Vercel's free Hobby tier prohibits commercial projects — client hostel sites require the Pro plan (or the risk is accepted knowingly). Convex and R2 stay on their generous free tiers.
+> **Cost note:** Vercel's free Hobby tier prohibits commercial projects — client hostel sites require the Pro plan (or the risk is accepted knowingly). Convex stays on its generous free tier.
 
 **The hostel is the client unit — never the branch.** A hostel is a single place by default; some hostels have branches. Both kinds are one hostel record with a `mode` field (`'unit' | 'multi'`). Implementation detail: a unit hostel is stored with exactly one implicit branch so rooms always belong to exactly one location and there's a single query shape — but the *product* language and UI only ever say "hostel," and the mode only decides whether a branch picker appears.
 
@@ -79,7 +78,7 @@ The core principle, extended to infrastructure: **N clients is N database rows, 
 
 - **Separate public and dashboard projects per hostel.** The public deployment serves the student-facing site. The dashboard deployment serves the owner/manager app and uses `HOSTEL_ID` to bind itself to one hostel.
 - **One Convex project.** Multi-branch orgs are a foreign key, not a fork.
-- **One R2 bucket.** Keys namespaced `hostels/{branchId}/room-1.jpg`. Never a bucket per client.
+- **No photo storage pipeline (2026-09-08).** ALL imagery — hero, branch photos, room-category stock images — is bundled static assets (`landing_page/assets/images.ts`, imported by the per-client shells): content-hashed, immutable-cache, next/image-optimized, same-origin, near-zero egress. Photos are curated by us at the annual refresh; the manager never uploads photos. The earlier R2 bucket + upload flow was removed with it (rooms first, then branches).
 
 ### Directory layout
 
@@ -88,7 +87,7 @@ hostel/                        ← one repo; one build deployed per hostel
 ├── SPEC.md                    ← this file
 ├── landing_page/              # public student-facing hostel site
 ├── dashboard/                 # owner/manager dashboard, root route is the app
-├── convex/                    # shared schema, queries, mutations, R2 component
+├── convex/                    # shared schema, queries, mutations
 ```
 
 (The internal tool is a separate deployment — its own small app against the same Convex.)
@@ -102,47 +101,57 @@ hostels                        ← the client unit: one hostel (single or multi-
   name                         ← required — draft a row with just name + mode + status
   mode                         ← 'unit' | 'multi' (required)
   status                       ← draft | live | paused (required)
-  customDomain?                ← everything below is optional; fill in before going live
-  whatsappNumber?              ← E.164, e.g. +233…
-  momoName?, momoNumber?, bookingFee?
-  tagline?, aboutCopy?         ← owner's own voice, curated by us
-  directions?, mapQuery?
-  heroImages[], gallery[]      ← R2 keys (asset rows, not inline)
-  testimonials[]               ← { name, program/year, quote, photoKey? }
-  theme?                       ← palette tokens (see §7.4)
-  renewalDate?
-  seo: { title, description }?
+  renewalDate?                 ← ours; business data for the internal tool
+  codePrefix?                  ← room-code prefix, seeded per client (e.g. "FRANCO") — codes read FRANCO-2026-001
+  replyToEmail?                ← where student email replies land (the manager's address) — PER HOSTEL: all clients
+                                 share one Convex deployment, so this is hostel data, never a deployment env var
+  bookingSeq?                  ← monotonic booking count driving the code sequence (serialized on this row)
+
+  Everything the public site renders as static content — tagline, about
+  copy, photos, testimonials, theme, MoMo details, SEO, directions — is
+  hardcoded per client in the site's strings file, not stored here. The
+  database holds only what must be live (rooms, prices, availability) or
+  manager-run (branches, enquiries), plus the small fields we oversee.
 
   Binding: each deployment selects its hostel by the row's `_id` via the
   HOSTEL_ID env var — no slug field, no lookup by name.
 
-branches                       ← multi-branch hostels (unit hostels have one implicit record)
+branches                       ← multi-branch hostels (unit hostels have one implicit record, auto-created by the dashboard)
   hostelId                     ← FK (required)
-  name                         ← required
-  slug?                        ← optional; only for /b/[branch] public routing
-  whatsappNumber?, directions? ← branch-level overrides where they differ
-  directionsNote?              ← "8 min walk to the main gate" style, per branch
-  sortOrder
+  name                         ← SEEDED ONCE by us (convex/seed.ts), stable — it is the key the public site's curated
+                                 shell matches on. NEVER manager-editable: no branch create/delete exists.
+  directionsNote?              ← "8 min walk from the main gate" style; the one structural thing managers edit
+  whatsappNumber?              ← per-branch caretaker's line (E.164), curated in the static shell; the branch's
+                                 line wins for chats/inquiries on its pages, the org's is the fallback
+  sortOrder                    ← seeded; the branch registry is infrastructure (like codePrefix), not live data
 
 rooms
   branchId                     ← FK; always a branch (unit hostels: their one implicit branch)
   hostelId                     ← denormalized for convenience
-  name                         ← e.g. "4-in-1 (Shared bath)"
+  name                         ← e.g. "2 in a room — New block (With TV)"
   occupancy                    ← 1 | 2 | 3 | 4
   bathType                     ← ensuite | shared
-  pricePerSemester             ← GHS, integer
+  pricePerYear                 ← GHS per academic year, integer
   availableCount               ← integer, owner-editable
   accepting                    ← boolean (the in/out toggle), owner-editable
   amenities?                   ← optional; subset of amenity taxonomy
-  photoKey?                    ← R2 key
+  blurb?                       ← one-line description, curated by us, seeded with the room;
+                                 deliberately NOT manager-editable (presentation copy)
   sortOrder
+
+  The room catalog is DATABASE data, not static-shell data: names, prices,
+  variants and blurbs are seeded once (convex/seed.ts per client) and owned
+  by the manager from the dashboard. The static shell carries only org-level
+  presentation (about, ledger, guide, FAQs, photos).
 
 inquiries
   branchId, hostelId           ← branch (implicit for unit hostels)
-  name, phone, roomName
-  moveInDate, message
+  name, phone, email?          ← email optional — receipts + booking confirmation go there
+  inquiryRef?                  ← FRANCO-2026-E001, issued at submission; matches chats to rows
+  roomName, moveInDate, message
   status                       ← new | contacted | booked
   source                       ← wa | form (see §7.3)
+  refCode?                     ← FRANCO-2026-001, issued once on first "booked"; never reused
   createdAt
 
 roomChangeLog                  ← ours, not exposed to owners
@@ -152,7 +161,7 @@ roomChangeLog                  ← ours, not exposed to owners
 ```
 
 **Validation invariants** (enforced in Convex mutations, not just the UI):
-- `pricePerSemester` must be a positive integer; cannot be set to 0 or blanked.
+- `pricePerYear` must be a positive integer; cannot be set to 0 or blanked.
 - `name` and `occupancy` cannot be blanked by an owner edit.
 - Every manager mutation takes the deployment's `HOSTEL_ID` and verifies the room/inquiry belongs to that hostel before writing — the deployment binding is the capability check in v1.
 
@@ -224,9 +233,9 @@ examplehostel.com/           (or example-hostel.vercel.app)
 
 **FR-A2 · "About this place" — owner's voice.** 2–3 paragraphs in the owner's own words, curated by us. This is the section listing apps cannot have. It must not read like marketing copy; it reads like a person.
 
-**FR-A3 · Rooms.** One card per room type: photos, occupancy ("4-in-1"), bath type, price per semester (GHS), availability count, amenities. Live data. Room CTA pre-selects that room in the inquiry form.
+**FR-A3 · Rooms.** One card per room type: photos, occupancy ("4-in-1"), bath type, price per academic year (GHS), availability count, amenities. Live data. Room CTA pre-selects that room in the inquiry form. **Rooms group by occupancy category** ("Two in a room") when a hostel carries several price variants under one category (TV, key, tier — see §8.5): one editorial row per category with the variants as expandable rows beneath it, so a 7-option branch stays scannable.
 
-**FR-A4 · Gallery.** Real character photos — corridors, common room, the view, the kitchen — not just bed-and-price specs. Responsive, sized-down images (mobile data cost is a real constraint here; see NFR-4).
+**FR-A4 · REMOVED (2026-09-08).** The gallery section is gone — the hostel page is rooms → practical → guide → good-to-know → location. `Hostel.gallery` survives ONLY as the photo fallback for rooms without their own photos (lib/live.ts).
 
 **FR-A5 · Testimonials.** Resident quotes with name + program/year, faces where available.
 
@@ -234,14 +243,17 @@ examplehostel.com/           (or example-hostel.vercel.app)
 
 **FR-A7 · Location & directions.** Landmark-based directions (this is how directions work locally — "behind the XYZ mosque, off the main road"), plus a map embed/link.
 
-**FR-A8 · Inquiry form → WhatsApp.** Fields: name, phone, room type (select), move-in date (semester select), optional message. On submit:
-1. A pre-filled WhatsApp message to the owner's number opens via `wa.me/<number>?text=…` — the student just taps send. The message is *structured*: name, room type wanted, move-in semester, phone — so the owner can answer immediately instead of "hi is there a room."
-2. The inquiry is logged to Convex (server action) before the redirect fires.
-3. (Production) A confirmation email receipt — "we got your inquiry, [hostel] will reach out on WhatsApp shortly" — via Pingram. Email is the receipt, never the operating channel.
+**FR-A8 · Inquiry form → WhatsApp.** The form lives on a **dedicated, shareable page** (2026-09-08): `/inquire` for unit hostels, `/b/[branch]/inquire` for a branch of a multi-branch org, and `/inquire` (with a location picker — FR-A0's pattern) at org level, so one link serves a whole multi-branch org while each inquiry still lands with the right caretaker. Room CTAs deep-link with `?room=…` pre-selected. Fields: name, phone, email (optional), room type (select), move-in date (semester select), optional message. On submit:
+**FR-A8 · Inquiry form → WhatsApp.** A dedicated, shareable inquiry page (2026-09-08): `/inquire` (unit hostels, with a location picker for multi-branch orgs) and `/b/[slug]/inquire` (branch-scoped). Fields: name, phone, **email (required — confirmations go there)**, **guardian name + phone**, **course/programme**, **level (100–400 / postgraduate)**, room type (select), **academic year — auto-set to the next one** (Jan–May → the running `(year-1)/year`; from June → `year/(year+1)`, e.g. June 2026 → `2026/2027`), optional message. On submit:
+1. The inquiry is logged to Convex and issued a **reference** — `{PREFIX}-{YEAR}-E{SEQ}` (e.g. `FRANCO-2026-E001`), sequential like the booking code but E-marked so the two never read alike.
+2. A pre-filled WhatsApp message to the branch caretaker's number opens with the reference, guardian and programme details in it. (The form holds a blank tab open during the user gesture, awaits the mutation for the reference, then navigates the tab — mobile Safari keeps popups synchronous-only.)
+3. A receipt email — with the reference — via Sequenzy. Email is the receipt, never the operating channel.
+
+**Channel decision (2026-09-07):** WhatsApp stays the operating channel — it is what the manager already uses and the product's promise is easier outreach, not a new workflow. The dashboard Inbox is the *record*: every form inquiry lands there with phone + email + reference, and marking one "booked" issues the student's room code and emails it. Email = receipts and confirmations only.
 
 **FR-A9 · Spam protection.** Honeypot field only. Turnstile deliberately dropped (friction vs. spam tradeoff accepted). Honeypot-filled submissions are discarded server-side.
 
-**FR-A10 · Payment info.** Display-only MoMo name + number (and booking fee amount if set). No payment processing.
+**FR-A10 · Payment info.** Display-only MoMo name + number, and either a booking fee amount (when the hostel uses one) or a per-hostel payment note explaining their real flow (e.g. Franco: pay, send the receipt, get your code). No payment processing.
 
 **FR-A11 · Sticky WhatsApp button.** The whole site's job is to start a conversation; a persistent "Chat on WhatsApp" button is on every screen.
 
@@ -255,13 +267,17 @@ examplehostel.com/           (or example-hostel.vercel.app)
 
 **FR-B2 · Security hygiene.** The dashboard is `noindex`, `nofollow`, excluded from any sitemap, and disallowed in `robots.txt` while authentication is deferred. It exposes real lead data. The dashboard hostname is the access boundary in v1; when authentication is added, access control must be enforced before rendering the dashboard.
 
-**FR-B3 · Inbox tab.** Chronological inquiry list: who, phone, room wanted, when, message. Status badges: new / contacted / booked. Toggle updates the inquiry row.
+**FR-B3 · Inbox tab.** The branch's enquiry list: who, reference (`FRANCO-2026-E001`), phone, email (when left), room wanted, when, message. **Status filter pills default to New — the working queue — with All last**; a search box covers reference, name, phone, room, code and email. Per-card actions: WhatsApp, Call, **Share code** (booked only — opens WhatsApp to the student with their room code already typed), and delete (two-tap confirm). At the list's foot: **Clear all enquiries** (two-tap confirm) — the end-of-campaign action for a new academic year; it clears the branch's inbox (or the whole hostel on unit hostels). Issued codes and references are never reused — the counters only move forward, so a cleared history can't collide with new codes. Toggling to "booked" issues the student's room code and emails it. **Code format (deterministic, never random):** `{PREFIX}-{YEAR}-{SEQ}` — the hostel's seeded prefix (e.g. `FRANCO`), the academic year the student paid for (from the move-in semester), and a monotonic per-hostel booking count (`FRANCO-2026-001`). A booking keeps its code forever; concurrent bookings serialize safely on the hostel row's counter. **Walk-ins:** the manager sends the student the site link (Share tab / WhatsApp) — the student books through the form, so the code system covers them too; no manual booking entry exists.
 
-**FR-B4 · Rooms tab.** *Narrow, structured self-service editing — price and availability only.* Per room row: price field + available count + in/out toggle. No free text, no photos, no layout — a bad edit here is impossible by construction ("GHS 450, 2 rooms left" looks identical whoever typed it). All edits write to `roomChangeLog`.
+**FR-B4 · Rooms tab.** *Full self-service room management — no photos.* Unit hostels: create, edit, and delete rooms with every detail — name, occupancy, bath type, price per academic year, rooms available, amenities, the accepting toggle. Multi-branch hostels: the same inside each branch. **NO photo uploads anywhere (2026-09-08):** all imagery — hero, branch photos, room-category stock images — is bundled static assets curated by us; the manager never uploads photos, and the public site shows one curated image per room category. One-tap availability steppers and the accepting switch save instantly; everything else opens a form validated with zod + react-hook-form and sanitized server-side. All edits write to `roomChangeLog` and appear on the public site immediately.
 
-**FR-B5 · Everything else is ours.** Photos, testimonials, copy, theming: annual refresh, done by us. The pitch line this enables: *"You control day-to-day pricing and availability yourself; I keep the site looking sharp once a year."*
+**FR-B5 · Everything else is ours.** Photos, testimonials, copy, theming, MoMo details: hardcoded per client in the strings file, refreshed by us annually. The pitch line this enables: *"You run the rooms day to day; I keep the site looking sharp once a year."*
 
-**FR-B6 · Hostel scope.** Each dashboard deployment is bound to one hostel by `HOSTEL_ID`. A multi-branch manager sees all branches' inquiries and rooms; a unit hostel has one implicit branch. Branch-level dashboard views can be added later if needed.
+**FR-B6 · Hostel scope.** Each dashboard deployment is bound to one hostel by `HOSTEL_ID`. A multi-branch manager sees all branches' inquiries and rooms; a unit hostel has one implicit branch.
+
+**FR-B6a · Hub-first branch navigation.** Multi-branch hostels with different people on site (like Franco: one caretaker per branch) open their dashboard **at the Branches hub** — the branch cards are the navigation, one tap enters that branch's workspace (Enquiries / Rooms / Share, all scoped). There is **no aggregated "all branches" inbox or rooms view** — each branch's work happens inside it. **Back is always one tap away:** on mobile the bottom bar leads with "Branches"; on desktop the sidebar nests — "← All branches" + the branch's name above its items. **Branch structure is ours, not the manager's:** branches are seeded once (like `codePrefix`) and cannot be created, renamed, or deleted from the dashboard — the name is the stable key the public site's curated shell matches on (a rename would orphan its WhatsApp line, photos and slug). The manager's branch edit is deliberately narrow: photos + the directions note. Adding/renaming a branch is an annual-refresh action by us. Each caretaker gets a **branch-locked deployment**: `NEXT_PUBLIC_BRANCH_ID` (a branch `_id`) pins the dashboard to their branch — no hub, no back, only their enquiries, rooms and share link (`/b/[slug]`). Unit hostels never see the branches level. **Honesty note:** branch scoping is view-level isolation only — v1 has no auth, and mutations are not branch-enforced server-side; real enforcement ships with the login tier.
+
+**FR-B7 · Share tab.** The manager's outreach asset, self-serve: the site URL (`NEXT_PUBLIC_SITE_URL`), a copy button, a "visit" link, and a downloadable QR code generated in the browser — the flyer/noticeboard/WhatsApp-status version of the one-link pitch. No more waiting on us to send a QR.
 
 ### 7.3 Surface C — Internal tool (ours)
 
@@ -296,7 +312,7 @@ This is the content simulation for the first demo build. It mirrors how the loca
 | **2-in-1** | 2 | The volume seller in private hostels |
 | **1-in-1** | 1 | Premium; usually ensuite, sometimes A/C |
 
-Each type exists in **ensuite** or **shared bath** variants. Pricing is quoted **per semester**, sometimes with a per-year option. Prices move during the admissions rush — hence live price editing being the one thing owners self-serve.
+Each type exists in **ensuite** or **shared bath** variants. Pricing is quoted **per academic year**. Prices move during the admissions rush — hence live price editing being the one thing owners self-serve.
 
 ### 8.2 Amenity taxonomy (the ones that actually sell locally)
 
@@ -311,11 +327,25 @@ Inquiry (WhatsApp) → chat / phone call → visit ("come and see the room") →
 - **Name:** Aseda Heights Hostel
 - **Mode:** `unit` — the entry page is the whole site (the manual mode value lives in the mock file). A second fictional multi-branch hostel can be added later to demo the picker flow.
 - **Location:** Kumasi — KNUST area ("8 minutes' walk to the main campus gate")
-- **Rooms:** 4-in-1 shared bath — GHS 1,900/sem; 2-in-1 shared — GHS 3,400/sem; 1-in-1 ensuite — GHS 5,200/sem
+- **Rooms:** 4-in-1 shared bath — GHS 1,900/yr; 2-in-1 shared — GHS 3,400/yr; 1-in-1 ensuite — GHS 5,200/yr (all per academic year)
 - **Booking fee:** GHS 300 via MoMo
 - **About-copy voice:** proud, plain-spoken owner — "we've run this house for eleven years," plant and water reliability front and center
 - **Testimonials:** 3 residents with program/year
 - **Images:** placeholder photography that reads like a real Ghanaian private hostel (building exterior, corridor, room, common room) — replaced by the client's real photos on sign-off
+
+### 8.5 The first client — Franco Hostel (real, in preview)
+
+**Who:** Franco Hostel, Fiapre, Sunyani — serving University of Energy and Natural Resources students, ~20 minutes from campus. Four branches: **Main, Annex 1, Annex 2, Annex 3** (mode: `multi`).
+
+**Confirmed facts (Kelvin, 2026-09-07):**
+- Wi-Fi on for everyone. Security man awake all night. **No plant** (no generator), **no study room** — the site never claims them.
+- Every room has its own bathroom, shared inside the room for 4-in-1 and 2-in-1; private for 1-in-1. Kitchen is shared.
+- Campus is a **20-minute walk** from Fiapre. Prices are **per academic year**.
+- Room categories carry **price variants** (same occupancy, different features/price) — hence the grouped-rooms UI (FR-A3). Main's confirmed prices (GHS/year): 4-in-1 5,000; 2-in-1 old block 6,000 (no TV) / 6,200 (TV) and new block 7,000 (no TV) / 7,200 (TV); 1-in-1 old block 9,200 / new block 10,500. All branches mirror Main (confirmed).
+- All branches (Annex 1–3) mirror Main's prices (confirmed).
+- Their real booking flow (what the site mirrors): student visits and checks rooms → pays by MoMo → sends the receipt to the manager on WhatsApp → manager confirms → student gets a room code. Our step-up: the code is issued by the dashboard when the manager marks "booked," and confirmed by email (FR-B3) — plus the receipt email on inquiry (FR-A8).
+
+**Preview wiring:** `HOSTEL_SLUG=franco-hostel` (static shell: `landing_page/lib/franco-hostel.ts`) + the seeded Convex hostel row (`npx convex dev --once` to push code, then `npx convex run seed:seedFrancoHostel`). Open questions for the client: real photos, the manager's WhatsApp + MoMo details, and real resident testimonials (current ones are placeholders).
 
 ---
 
@@ -335,9 +365,9 @@ Inquiry (WhatsApp) → chat / phone call → visit ("come and see the room") →
 | qrcode | 1.5.x | Flyer QR generation |
 | ESLint | 10.x flat config | Via `eslint-config-next@16`; `pnpm lint` script |
 | Hosting | Vercel | One project per hostel, `HOSTEL_ID` env; Pro tier required for commercial client sites |
-| Email receipts | Pingram | Verify current API docs at integration time (also does WhatsApp API — a future premium-tier option may live in the same account) |
+| Email receipts | Sequenzy SDK | Transactional emails sent from Convex (`"use node"` actions, `convex/emails.ts`); `SEQUENZY_API_KEY` lives on the Convex deployment env — the Next apps never send email and carry no key. Sender domain: `mail.hostels.kelpyshades.com` |
 | Analytics | Cloudflare Web Analytics | Free, privacy-friendly, dropped in per page; do not build analytics |
-| Images | R2 + shared image-processing worker | All hostel projects point at the same R2 bucket/worker; serve sized variants, never originals |
+| Images | Bundled static assets | **5 images per client** (2026-09-08 discipline): exterior + annex (the hero crossfade, one photo per branch) and room-4in1/2in1/1in1 (one stock image per room category). All live in `landing_page/assets/`, imported by the per-client shells — content-hashed URLs, immutable caching, next/image optimization. No R2, no uploads; swapping a client's photos = replacing files at the annual refresh |
 
 **Scaffolding command (per current Next.js docs):**
 ```bash
@@ -360,7 +390,7 @@ pnpm create next-app@latest hostel --yes   # TS + Tailwind + ESLint + App Router
 - **NFR-4 · Data cost.** No autoplaying video, no full-resolution originals, no heavy web fonts. A student on a limited bundle should be able to browse the whole site cheaply.
 - **NFR-5 · Privacy of lead data.** Owner inbox noindexed and sitemap-excluded (FR-B2). Inquiry data never leaves our Convex + the owner's WhatsApp.
 - **NFR-6 · Accessibility.** Contrast, focus states, labels on all form fields, tap targets ≥ 44px.
-- **NFR-7 · Durability.** Zero-maintenance posture: no schedulers, no queues, no servers we babysit. Convex, Vercel, and R2 are all managed.
+- **NFR-7 · Durability.** Zero-maintenance posture: no schedulers, no queues, no servers we babysit. Convex and Vercel are managed.
 - **NFR-8 · Differentiation audit.** Before signing client #2, view clients #1 and #2 side by side — if they read as the same template, the theming requirement (FR-A13) has failed.
 
 ---
@@ -373,9 +403,9 @@ Build order decision: **public page first, then the manager-facing site, then ou
 2. **Scaffold** — pnpm + Next 16 + TS + Tailwind 4 + ESLint, per §9.
 3. **Public site, demo hostel** — the full Aseda Heights page (FR-A0→A13) with hardcoded mock content in a typed `lib/mock-hostel.ts` (same shape as the Convex schema, so swapping to live data later is a data-source change, not a rewrite). Working WhatsApp flow with a test number. Working QR route.
    - **All public-page UI is decided under the huashu-design skill** (`.agents/skills/huashu-design`): 3 differentiated design directions offered before building → junior pass with placeholders → full pass with real photography (never SVG-drawn imagery or CSS silhouettes) → anti-slop checklist applied.
-4. **Owner/manager dashboard** — inbox + rooms views (Surface B) in the separate `dashboard` app, scoped to the deployment's `HOSTEL_ID`.
+4. **Owner/manager dashboard** — full manager surface (Surface B) in the separate `dashboard` app, scoped to the deployment's `HOSTEL_ID`: inbox, room CRUD for unit hostels, branch + room CRUD for multi-branch.
 5. **Client demo** — Kelvin shows the public page + the manager dashboard to the first hostel.
-6. On acceptance: **Convex wiring** (schema, real hostel, real content, R2 uploads), Pingram receipt email.
+6. On acceptance: **Convex wiring** (schema, real hostel, real content), Sequenzy receipt email.
 7. **Internal tool (Surface C)** — ours, built later when there is real client data to manage.
 
 The mockup must be a real running build — the demo has to *feel* like their future website, which a static image can't do.
@@ -387,7 +417,7 @@ The mockup must be a real running build — the demo has to *feel* like their fu
 | Deferred thing | Trigger to revisit |
 |---|---|
 | Tenant/tenant portal | A specific paying owner with 2–3 properties asks for something bigger *after* v1 works for them. Name it honestly: that's property-management software, a different product. |
-| Automated WhatsApp push (server sends to owner via API) | A few clients live + basic version proven; premium tier. Pingram already does WhatsApp API. |
+| Automated WhatsApp push (server sends to owner via API) | A few clients live + basic version proven; premium tier. |
 | Automated cross-branch lead redirect | Volume makes manual redirects painful. |
 | Org rollup link | First multi-branch hostel client signs. |
 | MoMo/payments integration | A client demands it and we price it as a tier. |
@@ -399,6 +429,7 @@ The mockup must be a real running build — the demo has to *feel* like their fu
 - **Public site:** `pnpm dev` → `localhost:3000` — walkthrough of every FR-A item on a phone-sized viewport; WhatsApp button opens a correctly pre-filled chat (test number); QR scans to the page; Lighthouse mobile pass.
 - **Mode routing:** unit hostel entry shows the full site directly; a branch path on a unit hostel redirects to the hostel home; unknown hostel or branch slug shows the branded 404 (not the default Next 404).
 - **Form:** honeypot submission discarded; valid submission logged + WhatsApp opens with structured message.
-- **Inbox/Rooms:** the manager dashboard opens at `/`; the deployment's `HOSTEL_ID` selects exactly one hostel; price edits reject 0/blank; change logs record edits; dashboard is `noindex` + robots-disallowed. Later authentication tests must cover the `/` gate and `/app` dashboard.
+- **Inbox/Rooms:** the manager dashboard opens at `/`; `HOSTEL_ID` selects exactly one hostel; unit hostels auto-create their implicit branch; room forms reject empty names, non-numeric and non-positive prices (zod, client and server); branches with rooms can't be deleted; every manager edit lands in `roomChangeLog`; dashboard is `noindex` + robots-disallowed.
+- **Photos:** NONE — all imagery is bundled static assets (`landing_page/assets/images.ts`): content-hashed, immutable-cache, next/image-optimized, same-origin. Swapping a client's photos = replacing files and redeploying.
 - **Internal tool (when built):** token gate blocks anonymous access; content swap reflects on the public site within a rebuild.
 - **Deploy:** each hostel's Vercel project answers at both its `*.vercel.app` URL and the client's custom domain; SSL auto-issued; `HOSTEL_ID` env selects the hostel.

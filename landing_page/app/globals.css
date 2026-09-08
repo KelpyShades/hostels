@@ -2,7 +2,7 @@
 
 /*
   Theme tokens — the "Folio" design (2026-09-07).
-  Hotel-folio language: bone paper, forest ink, brass figures, Cormorant
+  Hotel-folio language: bone paper, wine ink, brass figures, Cormorant
   display type. Per-hostel theming (FR-A13) swaps these values; components
   only reference vars, never raw hex.
 
@@ -19,17 +19,17 @@
 .dir-folio {
   --bg: #f3f2ec;
   --bg-soft: #faf9f4;
-  --deep: #152a20;
+  --deep: #2e131b;
   --deep-ink: #ede9dd;
-  --ink: #1f2420;
-  --ink-soft: #47504a;
-  --ink-muted: #5d665f;
-  --accent: #2e4b3b;
-  --accent-bright: #9fc6ad;
-  --accent-contrast: #f2f0e6;
+  --ink: #262022;
+  --ink-soft: #4d4644;
+  --ink-muted: #645c58;
+  --accent: #722f37;
+  --accent-bright: #d8a4ae;
+  --accent-contrast: #f6eff1;
   --brass: #b08a4f;
   --brass-bright: #c9a96a;
-  --glass-dark: rgba(21, 34, 26, 0.55);
+  --glass-dark: rgba(46, 19, 27, 0.55);
   --line: #e2dfd4;
   --line-strong: #cfc9ba;
   --field-bg: #ffffff;
@@ -44,9 +44,10 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Anchor navigation ("Check availability" → #inquire) — native smooth scroll */
+/* Anchor navigation (e.g. sticky CTA → #inquire on the inquiry page) — native smooth scroll */
 html {
   scroll-behavior: smooth;
+ overscroll-behavior: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -64,7 +65,7 @@ blockquote {
 }
 
 ::selection {
-  background: var(--deep, #152a20);
+  background: var(--deep, #2e131b);
   color: var(--deep-ink, #ede9dd);
 }
 

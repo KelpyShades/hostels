@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   formatGhs,
@@ -9,6 +11,7 @@ import { content } from "@/lib/content";
 import { PhotoCarousel } from "@/components/photo-carousel";
 import { Reveal } from "@/components/reveal";
 import { SectionTitle, shortName } from "@/components/site/shared";
+import { useLiveBranches } from "@/components/live-data";
 
 /**
  * Properties — the org view's branch picker: editorial rows (photos,
@@ -19,11 +22,16 @@ import { SectionTitle, shortName } from "@/components/site/shared";
 const c = content;
 
 export function PropertiesSection({ branches }: { branches: Branch[] }) {
+  const liveBranches = useLiveBranches(branches);
+  const fromOf = (b: Branch) => {
+    const from = minFrom(b.rooms);
+    return from ? formatGhs(from) : c.hero.facts.fromEmpty;
+  };
   return (
     <section id="properties" className="mx-auto max-w-6xl scroll-mt-16 px-5 py-24 sm:px-8 sm:py-32">
       <SectionTitle>{c.properties.heading}</SectionTitle>
       <div className="mt-16 space-y-24 sm:space-y-32">
-        {branches.map((b, i) => {
+        {liveBranches.map((b, i) => {
           const flipped = i % 2 === 1;
           const bOpen = openRooms(b);
           return (
@@ -47,10 +55,10 @@ export function PropertiesSection({ branches }: { branches: Branch[] }) {
                   </h3>
                   <p className="mt-6 flex flex-wrap items-baseline gap-x-3.5">
                     <span className="text-[clamp(1.5rem,2.6vw,1.9rem)] font-semibold leading-none tracking-[-0.01em] tabular-nums">
-                      {formatGhs(minFrom(b.rooms))}
+                      {fromOf(b)}
                     </span>
                     <span className="text-[13px] text-(--ink-muted)">
-                      {c.properties.from} · {c.properties.perSemester}
+                      {c.properties.from} · {c.properties.perYear}
                     </span>
                   </p>
                   <p
@@ -105,14 +113,14 @@ export function PropertiesSection({ branches }: { branches: Branch[] }) {
                 </tr>
               </thead>
               <tbody>
-                {branches.map((b) => (
+                {liveBranches.map((b) => (
                   <tr key={b.id} className="border-b border-(--line)">
                     <td className="py-4.5 pr-4 text-[15px] font-medium">{shortName(b.name)}</td>
                     <td className="hidden py-4.5 pr-4 text-[14.5px] text-(--ink-soft) sm:table-cell">
                       {b.directionsNote}
                     </td>
                     <td className="py-4.5 pr-4 text-[1.05rem] font-semibold tabular-nums">
-                      {formatGhs(minFrom(b.rooms))}
+                      {fromOf(b)}
                     </td>
                     <td className="py-4.5 text-[13.5px] font-medium text-(--accent)">
                       {openRooms(b)} {c.properties.roomsOpen}

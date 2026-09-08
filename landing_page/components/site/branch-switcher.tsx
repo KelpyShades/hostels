@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { openRooms, type Branch } from "@/lib/mock-hostel";
 import { content } from "@/lib/content";
+import { shortName } from "@/components/site/shared";
+import { useLiveBranches } from "@/components/live-data";
 
 /**
  * Branch switcher for multi-branch orgs: one nav slot regardless of
@@ -15,21 +18,21 @@ import { content } from "@/lib/content";
 
 const c = content;
 
-export interface BranchOption {
-  slug: string;
-  name: string;
-  open: number;
-}
-
 export function BranchSwitcher({
   currentSlug,
   currentName,
-  options,
+  branches,
 }: {
   currentSlug: string;
   currentName: string;
-  options: BranchOption[];
+  branches: Branch[];
 }) {
+  const liveBranches = useLiveBranches(branches);
+  const options = liveBranches.map((b) => ({
+    slug: b.slug,
+    name: shortName(b.name),
+    open: openRooms(b),
+  }));
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 

@@ -8,7 +8,10 @@
  * @module
  */
 
+import type * as emails from "../emails.js";
 import type * as manager from "../manager.js";
+import type * as public_ from "../public.js";
+import type * as seed from "../seed.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +20,10 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  emails: typeof emails;
   manager: typeof manager;
+  public: typeof public_;
+  seed: typeof seed;
 }>;
 
 /**
@@ -46,6 +52,4 @@ export declare const internal: FilterApi<
   FunctionReference<any, "internal">
 >;
 
-export declare const components: {
-  r2: import("@convex-dev/r2/_generated/component.js").ComponentApi<"r2">;
-};
+export declare const components: {};

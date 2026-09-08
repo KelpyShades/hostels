@@ -9,9 +9,12 @@
  * Flip it to demo either flow; mode is data, not a code fork.
  *
  * Multiple images: every room and branch carries an ordered `photos` list
- * (first = cover). Mock paths live in /public/mock — production keys are
- * R2 objects (SPEC.md §5 `photoKeys[]`).
+ * (first = cover). All sources are bundled static assets imported from
+ * assets/images.ts — content-hashed and next/image-optimized.
  */
+
+import { francoBranches, francoHostel } from "./franco-hostel";
+import { img } from "../assets/images";
 
 export type HostelMode = "unit" | "multi";
 
@@ -27,10 +30,29 @@ export type Amenity =
   | "study-room"
   | "ac";
 
-/** One photo in a room/branch carousel. Caption keeps mixed shots honest. */
+/** One photo in a room/branch carousel. Caption keeps mixed shots honest.
+ *  `src` is a bundled static-asset URL (assets/images.ts, imported by the
+ *  per-client shells) — content-hashed and next/image-optimized. There is
+ *  no photo upload pipeline; all imagery is curated by us. */
 export interface Photo {
-  src: string; // mock: path in /public/mock — prod: R2 key
+  src: string;
   caption?: string;
+}
+
+/** Assurance ledger (the dark "practical things" band) — per-hostel
+ *  curation: the owner's real claims, never generic amenity chips. */
+export interface LedgerData {
+  intro: string;
+  items: { figure: string; title: string; body: string }[];
+  also: string;
+}
+
+/** "How to book" — the client's real process, per-hostel. Different
+ *  hostels book differently (booking fee vs pay-then-receipt); the guide
+ *  must tell the truth for each. */
+export interface GuideData {
+  whatYouNeed: string[];
+  steps: { title: string; body: string }[];
 }
 
 export interface RoomType {
@@ -38,11 +60,10 @@ export interface RoomType {
   name: string;
   occupancy: 1 | 2 | 3 | 4;
   bathType: BathType;
-  pricePerSemester: number; // GHS
+  pricePerYear: number; // GHS, per academic year
   availableCount: number;
   accepting: boolean;
   amenities: Amenity[];
-  photos: Photo[]; // ordered, first = cover
   blurb: string;
   sortOrder: number;
 }
@@ -78,13 +99,23 @@ export interface Hostel {
   whatsappNumber: string; // E.164 — demo number, swap for the client's
   momoName: string;
   momoNumber: string;
-  bookingFee: number; // GHS
+  /** GHS booking fee — only when the hostel uses one (FR-A10). */
+  bookingFee?: number;
+  /** Replaces the fee line when there's no fixed booking fee — e.g.
+   *  Franco's pay-then-send-receipt flow, explained in the owner's voice. */
+  paymentNote?: string;
   aboutCopy: string[]; // paragraphs, owner's voice
+  /** The hero crossfade — exactly 2 images (2026-09-08): the exterior
+   *  and the annex. First = the static base. */
   heroImages: string[]; // ordered, first = cover (hero crossfade / framing)
-  gallery: { src: string; caption: string }[];
-  testimonials: Testimonial[];
+  /** ONE stock image per room category, keyed by occupancy — the room
+   *  photos on the public site (rooms carry no photos of their own).
+   *  3-in-1 shares the 2-in-1 image (rare category). */
+  roomImages: Record<1 | 2 | 3 | 4, string>;
   faqs: { question: string; answer: string }[]; // org-wide
   houseRules: { title: string; detail: string }[]; // org-wide (branch overrides later, on real demand)
+  ledger: LedgerData; // the assurance band — per-hostel, real claims only
+  guide: GuideData; // booking process — per-hostel, their real flow
   directions: string;
   mapQuery: string; // for a maps link
   status: "draft" | "live" | "paused";
@@ -92,7 +123,7 @@ export interface Hostel {
 
 /**
  * Aseda Heights Hostel — fictional but realistic KNUST-area hostel.
- * Prices are mid-range realistic GHS per semester (SPEC.md §8.4).
+ * Prices are mid-range realistic GHS per academic year (SPEC.md §8.4).
  * Manual mode switch lives here: 'unit' | 'multi'.
  */
 export const MODE: HostelMode = "multi";
@@ -115,38 +146,18 @@ export const asedaHeights: Hostel = {
     "Water is never a discussion here. The polytanks are filled twice a week and the borehole is there when the taps rest. There is a guard at the gate all night, cameras on both floors, and a study room that stays open past midnight during exams.",
     "Walk out of the main gate, take the road behind the mosque, and we are the cream building on your right — about eight minutes on foot. Come and see the room before you decide. We prefer it that way.",
   ],
-  heroImages: ["/mock/exterior.jpg", "/mock/common-room.jpg", "/mock/corridor.jpg"],
-  gallery: [
-    { src: "/mock/corridor.jpg", caption: "Ground floor corridor" },
-    { src: "/mock/common-room.jpg", caption: "The common room" },
-    { src: "/mock/kitchen.jpg", caption: "Shared kitchen" },
-    { src: "/mock/study-room.jpg", caption: "Study room, open till midnight" },
-  ],
-  testimonials: [
-    {
-      name: "Nana Adwoa",
-      detail: "Level 300, Civil Engineering",
-      quote:
-        "I came because of the plant, honestly. Two semesters and my reading has never stopped for dumsor. Madam is also always reachable — things get fixed the same week you report them.",
-    },
-    {
-      name: "Kwesi Frimpong",
-      detail: "Level 200, Computer Science",
-      quote:
-        "The study room saved me during exam season. And it's genuinely eight minutes to the gate — I've timed it, even walking slow.",
-    },
-    {
-      name: "Zainab Mohammed",
-      detail: "Level 400, Pharmacy",
-      quote:
-        "Four of us shared a 4-in-1 for two years. Water never finished, security is serious, and the kitchen is big enough that it never gets crowded in the morning.",
-    },
-  ],
+  heroImages: [img.exterior.src, img.annex.src],
+  roomImages: {
+    1: img.room1in1.src,
+    2: img.room2in1.src,
+    3: img.room2in1.src, // rare category — shares the 2-in-1 shot
+    4: img.room4in1.src,
+  },
   faqs: [
     {
       question: "Is the booking fee part of the rent?",
       answer:
-        "Yes — the fee comes off your first semester payment. It just holds the room so nobody else takes it.",
+        "Yes — the fee comes off your first payment. It just holds the room so nobody else takes it.",
     },
     {
       question: "What happens when the lights go off?",
@@ -176,38 +187,86 @@ export const asedaHeights: Hostel = {
     { title: "Payments", detail: "Fees by the stated dates; receipts issued for everything." },
     { title: "Reporting faults", detail: "Report to the caretaker the same day — things get fixed within the week." },
   ],
+  ledger: {
+    intro: "What eleven years of running this house have taught us to get right.",
+    items: [
+      {
+        figure: "24/7",
+        title: "Power",
+        body: "The plant comes on the moment the lights go. Your fan and your phone charger never know there was a blackout.",
+      },
+      {
+        figure: "2×",
+        title: "Water",
+        body: "Polytanks filled twice a week, and the borehole answers when the taps rest. Water is never a discussion here.",
+      },
+      {
+        figure: "All night",
+        title: "Security",
+        body: "A guard at the gate from dusk to dawn, with cameras on both floors.",
+      },
+      {
+        figure: "Midnight",
+        title: "Study room",
+        body: "Open past midnight during exams, with light that never fails.",
+      },
+    ],
+    also: "Also throughout the house: Wi-Fi, a shared kitchen big enough for the morning rush, and air conditioning in the 1-in-1.",
+  },
+  guide: {
+    whatYouNeed: [
+      "Your WhatsApp number",
+      "Your student ID number and programme",
+      "Your move-in semester",
+      "A way to pay the booking fee (MoMo)",
+    ],
+    steps: [
+      {
+        title: "Ask",
+        body: "Check the rooms and prices, then send an inquiry or chat with us on WhatsApp. We'll tell you what's open.",
+      },
+      {
+        title: "Come and see",
+        body: "Visit the room before you decide — we prefer it that way. We'll arrange a time on WhatsApp.",
+      },
+      {
+        title: "Hold your room",
+        body: "Pay the booking fee via MoMo and the room is held for you. It comes off your first payment.",
+      },
+      {
+        title: "Register",
+        body: "At the start of the semester, complete your registration and pay the balance.",
+      },
+      {
+        title: "Move in",
+        body: "Move in on your agreed date. If anything needs fixing, we're around.",
+      },
+    ],
+  },
   directions:
     "From the KNUST main gate, take the road behind the mosque. We're the cream-coloured building on the right, about eight minutes on foot. Look for the blue 'Aseda Heights' sign at the gate.",
   mapQuery: "KNUST Main Gate, Kumasi",
   status: "live",
 };
 
-/** The single implicit branch for unit mode (SPEC.md §5). */
+/** The single implicit branch for unit mode (SPEC.md §5). One photo per
+ *  branch (2026-09-08); rooms carry none — categories use roomImages. */
 export const mainLocation: Branch = {
   id: "aseda-main",
   slug: "main",
   name: "Aseda Heights — Main Building",
   directionsNote: "Behind the mosque, 8 min walk from the main gate",
-  photos: [
-    { src: "/mock/exterior.jpg", caption: "The main building, from the street" },
-    { src: "/mock/corridor.jpg", caption: "Ground floor corridor" },
-    { src: "/mock/common-room.jpg", caption: "The common room" },
-  ],
+  photos: [{ src: img.exterior.src, caption: "The main building, from the street" }],
   rooms: [
     {
       id: "room-4in1",
       name: "4-in-1",
       occupancy: 4,
       bathType: "shared",
-      pricePerSemester: 1900,
+      pricePerYear: 1900,
       availableCount: 6,
       accepting: true,
       amenities: ["power-backup", "water-storage", "wifi", "security", "kitchen"],
-      photos: [
-        { src: "/mock/room-4in1.jpg", caption: "The 4-in-1 room" },
-        { src: "/mock/kitchen.jpg", caption: "The shared kitchen" },
-        { src: "/mock/common-room.jpg", caption: "The common room" },
-      ],
       blurb:
         "Our most popular room. Four beds, big windows on both sides, shared bath on the corridor — never a queue in the morning.",
       sortOrder: 1,
@@ -217,7 +276,7 @@ export const mainLocation: Branch = {
       name: "2-in-1",
       occupancy: 2,
       bathType: "shared",
-      pricePerSemester: 3400,
+      pricePerYear: 3400,
       availableCount: 3,
       accepting: true,
       amenities: [
@@ -228,11 +287,6 @@ export const mainLocation: Branch = {
         "kitchen",
         "study-room",
       ],
-      photos: [
-        { src: "/mock/room-2in1.jpg", caption: "The 2-in-1 room" },
-        { src: "/mock/study-room.jpg", caption: "The study room — open till midnight" },
-        { src: "/mock/corridor.jpg", caption: "The corridor" },
-      ],
       blurb:
         "Two beds with a long desk between them — built for people who actually study in their room. Shared bath.",
       sortOrder: 2,
@@ -242,7 +296,7 @@ export const mainLocation: Branch = {
       name: "1-in-1 Ensuite",
       occupancy: 1,
       bathType: "ensuite",
-      pricePerSemester: 5200,
+      pricePerYear: 5200,
       availableCount: 2,
       accepting: true,
       amenities: [
@@ -253,11 +307,6 @@ export const mainLocation: Branch = {
         "kitchen",
         "study-room",
         "ac",
-      ],
-      photos: [
-        { src: "/mock/room-1in1.jpg", caption: "The 1-in-1 ensuite" },
-        { src: "/mock/corridor.jpg", caption: "The corridor" },
-        { src: "/mock/common-room.jpg", caption: "The common room" },
       ],
       blurb:
         "One person, your own bathroom, air conditioning. The quiet option at the end of the corridor.",
@@ -275,26 +324,17 @@ export const annexLocation: Branch = {
   directionsNote: "Past the junction, 12 min walk from the main gate",
   whatsappNumber: "233550000002", // DEMO — the Annex caretaker's own line
   walkToCampus: "12 min",
-  photos: [
-    { src: "/mock/annex.jpg", caption: "The Annex, from the street" },
-    { src: "/mock/kitchen.jpg", caption: "The shared kitchen" },
-    { src: "/mock/study-room.jpg", caption: "The study room" },
-  ],
+  photos: [{ src: img.annex.src, caption: "The Annex, from the street" }],
   rooms: [
     {
       id: "annex-4in1",
       name: "4-in-1",
       occupancy: 4,
       bathType: "shared",
-      pricePerSemester: 1750,
+      pricePerYear: 1750,
       availableCount: 4,
       accepting: true,
       amenities: ["power-backup", "water-storage", "wifi", "security", "kitchen"],
-      photos: [
-        { src: "/mock/room-4in1.jpg", caption: "The 4-in-1 room" },
-        { src: "/mock/annex.jpg", caption: "The Annex building" },
-        { src: "/mock/kitchen.jpg", caption: "The shared kitchen" },
-      ],
       blurb:
         "The budget option at the Annex — same management, same standards, a few minutes further from the gate.",
       sortOrder: 1,
@@ -304,7 +344,7 @@ export const annexLocation: Branch = {
       name: "2-in-1",
       occupancy: 2,
       bathType: "shared",
-      pricePerSemester: 3100,
+      pricePerYear: 3100,
       availableCount: 0,
       accepting: false,
       amenities: [
@@ -314,11 +354,6 @@ export const annexLocation: Branch = {
         "security",
         "kitchen",
         "study-room",
-      ],
-      photos: [
-        { src: "/mock/room-2in1.jpg", caption: "The 2-in-1 room" },
-        { src: "/mock/study-room.jpg", caption: "The study room" },
-        { src: "/mock/annex.jpg", caption: "The Annex building" },
       ],
       blurb: "Two beds, quiet corner of the Annex block, shared bath.",
       sortOrder: 2,
@@ -333,21 +368,59 @@ export function formatGhs(amount: number): string {
   return `GHS ${amount.toLocaleString("en-GH")}`;
 }
 
-/**
- * Deployment-level hostel selection (SPEC.md §6.1): in production each
- * Vercel project sets HOSTEL_SLUG; dev defaults to the demo hostel.
- * Mock-data stand-in for the future Convex `getHostel` query.
- */
+/** A room category — occupancy group with variant rooms under it
+ *  (e.g. Franco's four 2-in-1 price tiers). Categories keep a long
+ *  variant list scannable: open the category, see the tiers. */
+export interface RoomCategory {
+  occupancy: 1 | 2 | 3 | 4;
+  /** All variants, cheapest-first. */
+  rooms: RoomType[];
+}
+
+/** Group a branch's rooms into occupancy categories, cheapest tier first
+ *  within each. Categories with one room still render as a category —
+ *  one composition, no special cases. */
+export function groupRooms(rooms: RoomType[]): RoomCategory[] {
+  const byOccupancy = new Map<number, RoomType[]>();
+  for (const room of rooms) {
+    const list = byOccupancy.get(room.occupancy) ?? [];
+    list.push(room);
+    byOccupancy.set(room.occupancy, list);
+  }
+  return [...byOccupancy.entries()]
+    .sort((a, b) => b[0] - a[0]) // 4-in-1 (budget) first, 1-in-1 (premium) last
+    .map(([occupancy, list]) => ({
+      occupancy: occupancy as RoomCategory["occupancy"],
+      rooms: [...list].sort((a, b) => a.pricePerYear - b.pricePerYear),
+    }));
+}
+
+/** The demo hostels this shell can serve. A production deployment sets
+ *  HOSTEL_SLUG to its client's seed (landing_page/lib/<slug>-hostel.ts);
+ *  live Convex data (HOSTEL_ID) overrides identity, branches and rooms. */
+const shells: Record<string, { hostel: Hostel; branches: Branch[] }> = {
+  [asedaHeights.slug]: { hostel: asedaHeights, branches },
+  "franco-hostel": { hostel: francoHostel, branches: francoBranches },
+};
+
+/** Deployment-level hostel selection (SPEC.md §6.1): each Vercel project
+ *  sets HOSTEL_SLUG; dev defaults to the demo hostel. */
 export function getHostel(): Hostel {
   const slug = process.env.HOSTEL_SLUG ?? asedaHeights.slug;
-  if (slug !== asedaHeights.slug) {
-    throw new Error(`No hostel found for HOSTEL_SLUG=${slug}`);
+  const shell = shells[slug];
+  if (!shell) {
+    throw new Error(`No hostel shell for HOSTEL_SLUG=${slug}`);
   }
-  return asedaHeights;
+  return shell.hostel;
 }
 
 export function getBranches(): Branch[] {
-  return branches;
+  const slug = process.env.HOSTEL_SLUG ?? asedaHeights.slug;
+  const shell = shells[slug];
+  if (!shell) {
+    throw new Error(`No hostel shell for HOSTEL_SLUG=${slug}`);
+  }
+  return shell.branches;
 }
 
 /** Open rooms across a branch — accepting rooms' available counts, summed. */
@@ -355,7 +428,8 @@ export function openRooms(branch: Branch): number {
   return branch.rooms.reduce((n, r) => n + (r.accepting ? r.availableCount : 0), 0);
 }
 
-/** Lowest semester price across a set of rooms — the "from" figure. */
-export function minFrom(rooms: RoomType[]): number {
-  return Math.min(...rooms.map((r) => r.pricePerSemester));
+/** Lowest academic-year price across a set of rooms — the "from" figure.
+ *  null when there are no rooms yet (rendered as "Ask us"). */
+export function minFrom(rooms: RoomType[]): number | null {
+  return rooms.length ? Math.min(...rooms.map((r) => r.pricePerYear)) : null;
 }

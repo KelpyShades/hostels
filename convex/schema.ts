@@ -11,43 +11,37 @@ const inquiryStatus = v.union(
 );
 const inquirySource = v.union(v.literal("wa"), v.literal("form"));
 const changedBy = v.union(v.literal("owner"), v.literal("internal"));
-const assetKind = v.union(v.literal("hero"), v.literal("gallery"), v.literal("room"));
 
+// Everything the public site renders as static content — tagline, about copy,
+// photos, testimonials, theme, MoMo details, SEO, directions — is hardcoded
+// per client in the site's strings file, not stored here. The database holds
+// only what must be live (rooms, prices, availability) or manager-run
+// (branches, enquiries) plus the small business fields we oversee.
 export default defineSchema({
   hostels: defineTable({
-    // Identity — the only fields needed to draft a hostel row.
     name: v.string(),
     mode: hostelMode,
     status: hostelStatus,
-    // Everything below is optional so a draft can be created in the Convex
-    // dashboard with just name + mode + status, then filled in later.
-    customDomain: v.optional(v.string()),
-    whatsappNumber: v.optional(v.string()),
-    momoName: v.optional(v.string()),
-    momoNumber: v.optional(v.string()),
-    bookingFee: v.optional(v.number()),
-    tagline: v.optional(v.string()),
-    aboutCopy: v.optional(v.string()),
-    directions: v.optional(v.string()),
-    mapQuery: v.optional(v.string()),
-    seoTitle: v.optional(v.string()),
-    seoDescription: v.optional(v.string()),
+    // Ours, not the manager's: business data for the internal tool.
     renewalDate: v.optional(v.string()),
-    theme: v.optional(
-      v.object({
-        background: v.string(),
-        foreground: v.string(),
-        accent: v.string(),
-      }),
-    ),
+    // Room-code prefix, seeded per client (e.g. "FRANCO") — codes read
+    // FRANCO-2026-001, never a random string.
+    codePrefix: v.optional(v.string()),
+    // Where student email replies land — PER HOSTEL (the manager's
+    // address). All hostels share this deployment; a shared env var would
+    // let one client override another's replies. Seeded per client.
+    replyToEmail: v.optional(v.string()),
+    // Monotonic count of bookings ever issued — the sequence in the code.
+    // Lives on the hostel row so concurrent bookings serialize safely.
+    bookingSeq: v.optional(v.number()),
+    // Monotonic count of enquiries ever received — the sequence in the
+    // inquiry reference (FRANCO-2026-E001), same serialization trick.
+    inquirySeq: v.optional(v.number()),
   }).index("by_status", ["status"]),
 
   branches: defineTable({
     hostelId: v.id("hostels"),
     name: v.string(),
-    slug: v.optional(v.string()),
-    whatsappNumber: v.optional(v.string()),
-    directions: v.optional(v.string()),
     directionsNote: v.optional(v.string()),
     sortOrder: v.number(),
   }).index("by_hostel", ["hostelId"]),
@@ -58,11 +52,14 @@ export default defineSchema({
     name: v.string(),
     occupancy: v.union(v.literal(1), v.literal(2), v.literal(3), v.literal(4)),
     bathType,
-    pricePerSemester: v.number(),
+    pricePerYear: v.number(),
     availableCount: v.number(),
     accepting: v.boolean(),
     amenities: v.optional(v.array(v.string())),
-    photoKey: v.optional(v.string()),
+    // One-line description shown on the public site. Seeded with the room
+    // (curated by us); NOT editable from the manager room form, so manager
+    // edits never touch presentation copy.
+    blurb: v.optional(v.string()),
     sortOrder: v.number(),
   })
     .index("by_hostel", ["hostelId"])
@@ -74,23 +71,44 @@ export default defineSchema({
     hostelId: v.id("hostels"),
     name: v.string(),
     phone: v.string(),
+    // Optional — set from the inquiry form; receipt + booking confirmation
+    // emails go here (FR-A8). Email delivery is env-gated (convex/emails.ts).
+    email: v.optional(v.string()),
+    guardianName: v.optional(v.string()),
+    guardianPhone: v.optional(v.string()),
+    course: v.optional(v.string()),
+    level: v.optional(v.string()),
     roomName: v.string(),
     moveInDate: v.string(),
     message: v.optional(v.string()),
     status: inquiryStatus,
     source: inquirySource,
+    // Set once, the first time a manager marks the inquiry "booked": the
+    // student's room code, delivered by email — the written confirmation
+    // that replaces the manager's informal "I've given them a code".
+    refCode: v.optional(v.string()),
+    // Issued at submission (FRANCO-2026-E001): lets the manager match a
+    // WhatsApp chat / email to the inbox row at a glance.
+    inquiryRef: v.optional(v.string()),
     createdAt: v.number(),
   })
     .index("by_hostel", ["hostelId"])
     .index("by_branch", ["branchId"])
     .index("by_status", ["status"])
-    .index("by_created", ["createdAt"]),
+    .index("by_created", ["createdAt"])
+    .index("by_refCode", ["refCode"]),
 
   roomChangeLog: defineTable({
     branchId: v.id("branches"),
     roomId: v.id("rooms"),
     field: v.union(
-      v.literal("pricePerSemester"),
+      v.literal("created"),
+      v.literal("deleted"),
+      v.literal("name"),
+      v.literal("occupancy"),
+      v.literal("bathType"),
+      v.literal("amenities"),
+      v.literal("pricePerYear"),
       v.literal("availableCount"),
       v.literal("accepting"),
     ),
@@ -102,17 +120,4 @@ export default defineSchema({
     .index("by_room", ["roomId"])
     .index("by_branch", ["branchId"])
     .index("by_created", ["createdAt"]),
-
-  assets: defineTable({
-    hostelId: v.id("hostels"),
-    branchId: v.optional(v.id("branches")),
-    roomId: v.optional(v.id("rooms")),
-    key: v.string(),
-    kind: assetKind,
-    caption: v.optional(v.string()),
-    sortOrder: v.number(),
-  })
-    .index("by_hostel", ["hostelId"])
-    .index("by_branch", ["branchId"])
-    .index("by_room", ["roomId"]),
 });

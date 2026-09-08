@@ -20,6 +20,7 @@ export const content = {
     /** Facts bar at the base of the hero — figure + label pairs. */
     facts: {
       fromLabel: "Rooms from",
+      fromEmpty: "Ask us",
       walkLabel: "To the main gate",
       openLabel: "Open now",
       onFoot: "on foot",
@@ -29,8 +30,7 @@ export const content = {
 
   sections: {
     rooms: "Rooms & rates",
-    perSemester: "per semester",
-    gallery: "Around the house",
+    perYear: "per academic year",
     amenities: "The practical things",
     guide: "How to book",
     rules: "House rules",
@@ -43,87 +43,30 @@ export const content = {
   /** Nav labels (chrome — kept short; section titles can run longer). */
   nav: {
     rooms: "Rooms",
-    gallery: "Gallery",
     location: "Finding us",
     locations: "Locations",
     practical: "The practical things",
     allLocations: "All locations",
   },
 
-  /** Assurance ledger — the dark "practical things" band. Per-hostel
-   *  curation derived from the owner's aboutCopy; the figures are the
-   *  design, the bodies are the owner's own claims. */
-  ledger: {
-    intro: "What eleven years of running this house have taught us to get right.",
-    items: [
-      {
-        figure: "24/7",
-        title: "Power",
-        body: "The plant comes on the moment the lights go. Your fan and your phone charger never know there was a blackout.",
-      },
-      {
-        figure: "2×",
-        title: "Water",
-        body: "Polytanks filled twice a week, and the borehole answers when the taps rest. Water is never a discussion here.",
-      },
-      {
-        figure: "All night",
-        title: "Security",
-        body: "A guard at the gate from dusk to dawn, with cameras on both floors.",
-      },
-      {
-        figure: "Midnight",
-        title: "Study room",
-        body: "Open past midnight during exams, with light that never fails.",
-      },
-    ],
-    also: "Also throughout the house: Wi-Fi, a shared kitchen big enough for the morning rush, and air conditioning in the 1-in-1.",
-  },
+  /** Assurance ledger + registration guide live in the per-hostel seed
+   *  (lib/mock-hostel.ts Hostel.ledger / Hostel.guide) — different hostels
+   *  make different claims and book differently; the chrome stays shared. */
 
   location: {
     openInMaps: "Open in Google Maps",
     walkNote: "on foot, to the main gate",
   },
 
-  /** Registration-guide section (adapted from the TYB reference site —
-   *  org-wide: the process is the same across branches; only the WhatsApp
-   *  contact and open rooms differ per branch). */
-  guide: {
-    beforeYouStart: "Before you start",
-    whatYouNeed: [
-      "Your WhatsApp number",
-      "Your student ID number and programme",
-      "Your move-in semester",
-      "A way to pay the booking fee (MoMo)",
-    ],
-    theProcess: "The process",
-    steps: [
-      {
-        title: "Ask",
-        body: "Check the rooms and prices, then send an inquiry or chat with us on WhatsApp. We'll tell you what's open.",
-      },
-      {
-        title: "Come and see",
-        body: "Visit the room before you decide — we prefer it that way. We'll arrange a time on WhatsApp.",
-      },
-      {
-        title: "Hold your room",
-        body: "Pay the booking fee via MoMo and the room is held for you. It comes off your first semester payment.",
-      },
-      {
-        title: "Register",
-        body: "At the start of the semester, complete your registration and pay the balance.",
-      },
-      {
-        title: "Move in",
-        body: "Move in on your agreed date. If anything needs fixing, we're around.",
-      },
-    ],
-  },
-
   closing: {
     line: "Come and see the room before you decide.",
     sub: "Rooms fill quickly once admissions open. Send an inquiry or arrange a visit on WhatsApp.",
+  },
+
+  /** Guide chrome — the steps themselves are per-hostel (Hostel.guide). */
+  guide: {
+    beforeYouStart: "Before you start",
+    theProcess: "The process",
   },
 
   rooms: {
@@ -138,6 +81,33 @@ export const content = {
     ensuite: "ensuite",
     sharedBath: "shared bath",
     sleeps: "Sleeps",
+    /** Occupancy categories (grouped rooms, e.g. Franco's variant tiers). */
+    categories: {
+      1: "One in a room",
+      2: "Two in a room",
+      3: "Three in a room",
+      4: "Four in a room",
+    } satisfies Record<1 | 2 | 3 | 4, string>,
+    from: "from",
+    /** "3 options" — variants under one category. */
+    optionCount: (n: number) => (n === 1 ? "1 option" : `${n} options`),
+    chatAboutThese: "Chat about these rooms",
+    /** Variant tile title — the part after " — " in a seeded room name
+     *  ("2 in a room — Old block (No TV)" → "Old block (No TV)"). */
+    variantLabel: (name: string) => {
+      const parts = name.split(" — ");
+      return parts.length > 1 ? (parts.slice(1).join(" — ")) : name;
+    },
+  },
+
+  /** The dedicated inquiry page (shareable link — unit: /inquire,
+   *  branch: /b/[slug]/inquire, org-level picker: /inquire on multi). */
+  inquirePage: {
+    backToRooms: "Back to rooms & rates",
+    branchQuestion: "Which location are you asking about?",
+    branchHint: "Your message goes to that location's caretaker on WhatsApp.",
+    askingAt: "Asking at",
+    changeLocation: "Change",
   },
 
   rateCard: {
@@ -145,7 +115,7 @@ export const content = {
     room: "Room",
     sleeps: "Sleeps",
     bath: "Bath",
-    price: "Per semester",
+    price: "Per academic year",
     availability: "Availability",
     waitlist: "Waitlist",
   },
@@ -155,7 +125,7 @@ export const content = {
     heading: "Choose your location",
     viewRooms: "View rooms & rates",
     from: "from",
-    perSemester: "per semester",
+    perYear: "per academic year",
     roomsOpen: "rooms open",
     fullyBooked: "Fully booked",
     waitlistOpen: "waitlist open",
@@ -175,54 +145,70 @@ export const content = {
     namePlaceholder: "e.g. Ama Mensah",
     phone: "Phone / WhatsApp",
     phonePlaceholder: "05X XXX XXXX",
+    email: "Email",
+    emailPlaceholder: "you@example.com — your booking confirmation goes here",
+    guardianName: "Guardian's name",
+    guardianNamePlaceholder: "e.g. Mr. Kwame Mensah",
+    guardianPhone: "Guardian's phone",
+    course: "Course / programme",
+    coursePlaceholder: "e.g. BSc. Computer Science",
+    level: "Level",
+    levelOptions: ["Level 100", "Level 200", "Level 300", "Level 400", "Postgraduate"],
+    academicYear: "Academic year",
     roomType: "Room type",
     chooseRoom: "Choose a room…",
     moveIn: "Move-in",
-    whichSemester: "Which semester?",
     anythingElse: "Anything else?",
     optional: "(optional)",
     messagePlaceholder: "e.g. I'd like to visit this Saturday",
     submit: "Send on WhatsApp",
-    helper: "Opens WhatsApp with your details already typed — you just press send.",
-    sentHelper: "WhatsApp should have opened — just press send there and we'll reply.",
+    helper: "Opens WhatsApp with your details already typed — you just press send. Your confirmation arrives by email.",
+    sentHelper: "WhatsApp should have opened — just press send there and we'll reply. Your reference and confirmation are on their way to your email.",
     errors: {
       name: "Please enter your name",
       phoneShort: "Enter a phone number we can reach you on",
       phoneLong: "That number looks too long",
+      emailRequired: "Enter your email — your booking confirmation goes there",
+      emailInvalid: "That email address doesn't look right",
+      guardianName: "Enter your guardian's name",
+      course: "Enter your course or programme",
+      level: "Choose your level",
       room: "Choose a room type",
-      moveIn: "Choose a semester",
+      moveIn: "Choose the academic year",
       messageLong: "Keep it short — details can come on WhatsApp",
     },
   },
 
   booking: {
     feeLabel: "Booking fee",
-    holdsRoom: "It holds your room and comes off your first semester payment.",
+    holdsRoom: "It holds your room and comes off your first payment.",
     payVia: "Pay via MoMo",
   },
 
   chat: {
     floatingAction: "Chat on WhatsApp",
     generalGreeting: "Hello, I'd like to ask about rooms at your hostel.",
-    roomGreeting: "Hello, I'm interested in the {room} room at {hostel}. Is it still available?",
-    /** Pre-filled WhatsApp inquiry message (FR-A8) — {tokens} replaced in lib/wa.ts */
+    /** With room context (lib/wa.ts passes the branch's rooms): names the
+     *  categories from the UI — "your 4 in 1, 2 in 1 and 1 in 1 rooms". */
+    generalGreetingRooms: "Hello, I'd like to ask about your {categories} rooms. What's still available?",
+    roomGreeting: "Hello, I'm interested in the {room} at {hostel}. Is it still available?",
+    /** Pre-filled WhatsApp inquiry message (FR-A8) — {tokens} replaced in lib/wa.ts.
+     *  The reference line lets the manager match the chat to the inbox row. */
     inquiryMessage: [
       "Hello, I found {hostel} online.",
       "",
       "Name: {name}",
       "Phone: {phone}",
+      "Guardian: {guardian} — {guardianPhone}",
+      "Programme: {course}, {level}",
       "Room wanted: {room}",
-      "Move-in: {moveIn}",
+      "Academic year: {moveIn}",
+      "{ref}",
       "{note}",
       "",
       "Please let me know if it's available. Thank you!",
     ],
     notePrefix: "Note:",
-    semesters: ["September 2026 semester", "January 2027 semester"],
-  },
-
-  gallery: {
-    heroCaption: "The main building, from the street.",
   },
 
   notFound: {
@@ -250,6 +236,17 @@ export const content = {
 } as const;
 
 export type Content = typeof content;
+
+/** The academic years the form offers, next one first (FR-A8):
+ *  the Ghanaian AY runs ~Sept–May, so Jan–May is (year-1)/year and from
+ *  June the "next" AY is year/(year+1) — the one admissions open for.
+ *  E.g. June 2026 → ["2026/2027", "2027/2028"]. */
+export function academicYears(count = 2): string[] {
+  const now = new Date();
+  const year = now.getFullYear();
+  const start = now.getMonth() + 1 >= 6 ? year : year - 1;
+  return Array.from({ length: count }, (_, i) => `${start + i}/${start + i + 1}`);
+}
 
 /** Availability phrase for a room — "2 rooms left" / "1 room left" / "Full — waiting list". */
 export function availabilityLabel(

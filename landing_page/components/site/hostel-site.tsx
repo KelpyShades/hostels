@@ -7,11 +7,9 @@ import { BranchSwitcher } from "@/components/site/branch-switcher";
 import { OrgHero, BranchHero } from "@/components/site/hero";
 import { RoomsSection } from "@/components/site/rooms";
 import { Ledger } from "@/components/site/ledger";
-import { GallerySection } from "@/components/site/gallery";
 import { GuideSection } from "@/components/site/guide";
 import { GoodToKnowSection } from "@/components/site/good-to-know";
 import { FindingUsSection } from "@/components/site/finding-us";
-import { InquirySection } from "@/components/site/inquiry-section";
 import { ClosingFooter } from "@/components/site/closing-footer";
 import { StickyBar } from "@/components/site/sticky-bar";
 import { shortName, wordmarkText } from "@/components/site/shared";
@@ -46,11 +44,14 @@ export function HostelSite({
 }) {
   const open = openRooms(branch);
   const contact = branchContact(hostel, branch);
-  const chatHref = buildGeneralChatLink(contact);
+  const chatHref = buildGeneralChatLink(contact, branch.rooms);
+  // The dedicated, shareable inquiry page (2026-09-08): every CTA on
+  // this site leads there; room CTAs add ?room=… pre-selection.
+  const inquireHref =
+    hostel.mode === "unit" ? "/inquire" : `/b/${branch.slug}/inquire`;
 
   const sectionLinks: NavLink[] = [
     { href: "#rooms", label: c.nav.rooms },
-    { href: "#gallery", label: c.nav.gallery },
     { href: "#location", label: c.nav.location },
   ];
 
@@ -58,11 +59,7 @@ export function HostelSite({
     <BranchSwitcher
       currentSlug={branch.slug}
       currentName={shortName(branch.name)}
-      options={siblingBranches.map((b) => ({
-        slug: b.slug,
-        name: shortName(b.name),
-        open: openRooms(b),
-      }))}
+      branches={siblingBranches}
     />
   ) : undefined;
 
@@ -73,7 +70,7 @@ export function HostelSite({
         wordmarkHref="/"
         links={sectionLinks}
         ctaLabel={c.cta}
-        ctaHref="#inquire"
+        ctaHref={inquireHref}
         chatHref={chatHref}
         chatLabel={c.chat.floatingAction}
         switcher={switcher}
@@ -87,17 +84,20 @@ export function HostelSite({
 
       <main>
         {/* Rooms & rates — first after the hero: it's what visitors came for */}
-        <RoomsSection hostel={hostel} branch={branch} contact={contact} />
-        <Ledger />
-        <GallerySection hostel={hostel} />
+        <RoomsSection
+          hostel={hostel}
+          branch={branch}
+          contact={contact}
+          inquireHref={inquireHref}
+        />
+        <Ledger hostel={hostel} />
         <GuideSection hostel={hostel} />
         <GoodToKnowSection hostel={hostel} />
         <FindingUsSection hostel={hostel} branch={branch} />
-        <InquirySection branch={branch} contact={contact} />
       </main>
 
-      <ClosingFooter hostel={hostel} links={sectionLinks} ctaHref="#inquire" chatHref={chatHref} />
-      <StickyBar open={open} ctaHref="#inquire" chatHref={chatHref} />
+      <ClosingFooter hostel={hostel} links={sectionLinks} ctaHref={inquireHref} chatHref={chatHref} />
+      <StickyBar open={open} branchId={branch.id} ctaHref={inquireHref} chatHref={chatHref} />
     </div>
   );
 }

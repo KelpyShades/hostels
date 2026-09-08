@@ -1,3 +1,5 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -9,6 +11,7 @@ import {
   type RoomType,
 } from "@/lib/mock-hostel";
 import { content } from "@/lib/content";
+import { useLiveBranch, useLiveOpen, useLiveRooms } from "@/components/live-data";
 import { heroNameLines, shortName } from "@/components/site/shared";
 
 /**
@@ -149,6 +152,9 @@ export function OrgHero({
   open: number;
   rooms: RoomType[];
 }) {
+  const liveRooms = useLiveRooms(rooms);
+  const liveOpen = useLiveOpen(open);
+  const from = minFrom(liveRooms);
   return (
     <HeroFrame
       images={hostel.heroImages}
@@ -163,8 +169,8 @@ export function OrgHero({
       facts={[
         {
           label: c.hero.facts.fromLabel,
-          value: formatGhs(minFrom(rooms)),
-          note: c.sections.perSemester,
+          value: from ? formatGhs(from) : c.hero.facts.fromEmpty,
+          note: c.sections.perYear,
         },
         {
           label: c.hero.facts.walkLabel,
@@ -172,10 +178,10 @@ export function OrgHero({
           note: c.hero.facts.onFoot,
         },
         {
-          label: open > 0 ? c.hero.facts.openLabel : c.properties.fullyBooked,
-          value: open > 0 ? `${open} rooms` : c.rooms.waitListShort,
-          note: open > 0 ? c.hero.availableNow : undefined,
-          dot: open > 0,
+          label: liveOpen > 0 ? c.hero.facts.openLabel : c.properties.fullyBooked,
+          value: liveOpen > 0 ? `${liveOpen} rooms` : c.rooms.waitListShort,
+          note: liveOpen > 0 ? c.hero.availableNow : undefined,
+          dot: liveOpen > 0,
         },
       ]}
     />
@@ -184,27 +190,29 @@ export function OrgHero({
 
 /** One branch of a multi-branch org — this branch's identity and numbers. */
 export function BranchHero({ hostel, branch }: { hostel: Hostel; branch: Branch }) {
-  const open = openRooms(branch);
+  const liveBranch = useLiveBranch(branch);
+  const open = openRooms(liveBranch);
+  const from = minFrom(liveBranch.rooms);
   return (
     <HeroFrame
-      images={branch.photos.map((p) => p.src)}
-      alt={branch.name}
+      images={liveBranch.photos.map((p) => p.src)}
+      alt={liveBranch.name}
       eyebrow={
         <Link
           href="/"
-          className="folio-rise inline-flex min-h-10 items-center gap-2 rounded-(--radius) border border-(--deep-ink)/40 px-4 text-[12.5px] font-semibold text-(--deep-ink) transition-colors hover:bg-(--deep-ink)/10"
+          className="folio-rise inline-flex max-w-max min-h-10 items-center gap-2 rounded-(--radius) border border-(--deep-ink)/40 px-4 text-[12.5px] font-semibold text-(--deep-ink) transition-colors hover:bg-(--deep-ink)/10"
         >
           <span aria-hidden="true">←</span>
           {c.nav.allLocations}
         </Link>
       }
-      name={shortName(branch.name)}
-      tagline={`${branch.directionsNote}.`}
+      name={shortName(liveBranch.name)}
+      tagline={`${liveBranch.directionsNote}.`}
       facts={[
         {
           label: c.hero.facts.fromLabel,
-          value: formatGhs(minFrom(branch.rooms)),
-          note: c.sections.perSemester,
+          value: from ? formatGhs(from) : c.hero.facts.fromEmpty,
+          note: c.sections.perYear,
         },
         {
           label: open > 0 ? c.hero.facts.openLabel : c.properties.fullyBooked,
@@ -212,11 +220,17 @@ export function BranchHero({ hostel, branch }: { hostel: Hostel; branch: Branch 
           note: open > 0 ? c.hero.availableNow : undefined,
           dot: open > 0,
         },
-        {
-          label: c.booking.feeLabel,
-          value: formatGhs(hostel.bookingFee),
-          note: c.hero.facts.feeNote,
-        },
+        hostel.bookingFee
+          ? {
+              label: c.booking.feeLabel,
+              value: formatGhs(hostel.bookingFee),
+              note: c.hero.facts.feeNote,
+            }
+          : {
+              label: c.hero.facts.walkLabel,
+              value: hostel.walkToCampus,
+              note: c.hero.facts.onFoot,
+            },
       ]}
     />
   );

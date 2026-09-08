@@ -1,6 +1,9 @@
+"use client";
+
 import { content } from "@/lib/content";
 import { WhatsAppGlyph } from "@/components/inquiry-form";
 import { ScrollAppear } from "@/components/scroll-appear";
+import { useLiveOpen } from "@/components/live-data";
 
 /**
  * Sticky availability bar (mobile) + floating WhatsApp pill (desktop) —
@@ -13,13 +16,16 @@ const c = content;
 
 export function StickyBar({
   open,
+  branchId,
   ctaHref,
   chatHref,
 }: {
   open: number;
+  branchId?: string;
   ctaHref: string;
   chatHref: string;
 }) {
+  const liveOpen = useLiveOpen(open, branchId);
   return (
     <>
       <ScrollAppear className="fixed inset-x-0 bottom-0 z-40 sm:hidden">
@@ -27,7 +33,7 @@ export function StickyBar({
           <div className="flex items-center justify-between gap-3 px-5 py-3">
             <span className="flex items-center gap-2.5 text-[13px] font-medium text-(--deep-ink)/85">
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-(--brass-bright)" />
-              {open > 0 ? `${open} ${c.properties.roomsOpen}` : c.properties.fullyBooked}
+              {liveOpen > 0 ? `${liveOpen} ${c.properties.roomsOpen}` : c.properties.fullyBooked}
             </span>
             <div className="flex items-center gap-2">
               <a

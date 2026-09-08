@@ -1,39 +1,29 @@
-"use client";
-
-import type { ReactNode } from "react";
+import Link from "next/link";
 
 /**
- * "Check availability" CTA on a room section (FR-A3: the room CTA
- * pre-selects that room in the inquiry form). A button (not an anchor):
- * it performs an action — dispatches the preselect event the InquiryForm
- * listens for — then navigates to #inquire (native anchor behavior via
- * location.hash; html has scroll-behavior: smooth — no scrollIntoView,
- * per huashu rule).
+ * "Check availability" CTA on a room tile/section (FR-A3: the room CTA
+ * pre-selects that room in the inquiry form). Now a link to the dedicated
+ * inquiry page — `/inquire?room=…` (unit) or `/b/[slug]/inquire?room=…`
+ * (branch) — where the form opens with that exact room chosen.
  */
 
-export const PRESELECT_ROOM_EVENT = "hostel:preselect-room";
+/** Inquiry-page href with a specific room pre-selected. */
+export function inquireRoomHref(inquireHref: string, roomName: string): string {
+  return `${inquireHref}?room=${encodeURIComponent(roomName)}`;
+}
 
 export function RoomCheckCta({
-  roomName,
+  href,
   className = "",
   children,
 }: {
-  roomName: string;
+  href: string;
   className?: string;
-  children: ReactNode;
+  children: React.ReactNode;
 }) {
   return (
-    <button
-      type="button"
-      className={`cursor-pointer ${className}`}
-      onClick={() => {
-        window.dispatchEvent(
-          new CustomEvent(PRESELECT_ROOM_EVENT, { detail: { roomName } }),
-        );
-        window.location.hash = "inquire";
-      }}
-    >
+    <Link href={href} className={className}>
       {children}
-    </button>
+    </Link>
   );
 }

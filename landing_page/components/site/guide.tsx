@@ -4,8 +4,11 @@ import { Reveal } from "@/components/reveal";
 import { SectionTitle } from "@/components/site/shared";
 
 /**
- * How to book — the numbered steps beside the fee "folio": the booking fee,
- * what it does, and the MoMo details, in a hairline card.
+ * How to book — the numbered steps beside the payment "folio". The steps
+ * and the payment card are per-hostel (`Hostel.guide`, `bookingFee` /
+ * `paymentNote`): hostels with a booking fee show the fee card; hostels
+ * like Franco, where students pay and send a receipt, show their real
+ * process instead. One composition, two truths.
  */
 
 const c = content;
@@ -18,13 +21,21 @@ export function GuideSection({ hostel }: { hostel: Hostel }) {
           <SectionTitle>{c.sections.guide}</SectionTitle>
           <Reveal className="mt-12">
             <div className="border border-(--line-strong) bg-(--bg-soft) p-8">
-              <p className="text-[13px] font-medium text-(--ink-muted)">{c.booking.feeLabel}</p>
-              <p className="mt-3 text-[2.4rem] font-semibold leading-none tracking-[-0.01em] tabular-nums">
-                {formatGhs(hostel.bookingFee)}
-              </p>
-              <p className="mt-3 text-[14.5px] leading-relaxed text-(--ink-soft)">
-                {c.booking.holdsRoom}
-              </p>
+              {hostel.bookingFee ? (
+                <>
+                  <p className="text-[13px] font-medium text-(--ink-muted)">{c.booking.feeLabel}</p>
+                  <p className="mt-3 text-[2.4rem] font-semibold leading-none tracking-[-0.01em] tabular-nums">
+                    {formatGhs(hostel.bookingFee)}
+                  </p>
+                  <p className="mt-3 text-[14.5px] leading-relaxed text-(--ink-soft)">
+                    {c.booking.holdsRoom}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[15px] leading-[1.7] text-(--ink-soft)">
+                  {hostel.paymentNote}
+                </p>
+              )}
               <div className="mt-7 border-t border-(--line) pt-6">
                 <p className="text-[14.5px] font-semibold">{c.booking.payVia}</p>
                 <p className="mt-1.5 text-[15px] text-(--ink-soft)">
@@ -38,7 +49,7 @@ export function GuideSection({ hostel }: { hostel: Hostel }) {
           <Reveal className="mt-8">
             <p className="text-[13px] font-medium text-(--ink-muted)">{c.guide.beforeYouStart}</p>
             <ul className="mt-4 space-y-2">
-              {c.guide.whatYouNeed.map((item) => (
+              {hostel.guide.whatYouNeed.map((item) => (
                 <li key={item} className="flex items-baseline gap-3 text-[14.5px] text-(--ink-soft)">
                   <span aria-hidden="true" className="h-1 w-1 shrink-0 -translate-y-px rounded-full bg-(--accent)" />
                   {item}
@@ -49,7 +60,7 @@ export function GuideSection({ hostel }: { hostel: Hostel }) {
         </div>
         <div className="lg:col-span-7">
           <ol className="mt-2 lg:mt-24">
-            {c.guide.steps.map((step, i) => (
+            {hostel.guide.steps.map((step, i) => (
               <Reveal key={step.title}>
                 <li className="grid grid-cols-[3.25rem_1fr] gap-5 border-t border-(--line-strong) py-8 sm:gap-8">
                   <span className="font-(family-name:--font-display) text-[1.75rem] font-medium leading-none text-(--accent)">

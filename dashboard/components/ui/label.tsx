@@ -6,6 +6,14 @@ type LabelProps = ComponentPropsWithoutRef<typeof LabelPrimitive.Root> & {
   htmlFor: string;
 };
 
-export function Label({ className, htmlFor, ...props }: LabelProps) {
-  return <LabelPrimitive.Root htmlFor={htmlFor} className={cn("text-xs font-semibold text-slate-600", className)} {...props} />;
+function Label({ className, htmlFor, ...props }: LabelProps) {
+  return (
+    <LabelPrimitive.Root
+      htmlFor={htmlFor}
+      className={cn("text-sm font-medium leading-none text-foreground", className)}
+      {...props}
+    />
+  );
 }
+
+export { Label };

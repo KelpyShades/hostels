@@ -34,9 +34,17 @@ export function branchContact(hostel: Hostel, branch: Branch): ChatContact {
 export interface InquiryDraft {
   name: string;
   phone: string;
+  guardianName: string;
+  guardianPhone: string;
+  course: string;
+  level: string;
   roomName: string;
-  moveIn: string;
+  moveIn: string; // the academic year label, e.g. "2026/2027"
   message?: string;
+  /** The inquiry reference (FRANCO-2026-E001), returned by submitInquiry —
+   *  included in the WhatsApp message so the manager can match the chat
+   *  to the inbox row instantly. */
+  ref?: string;
 }
 
 function fillTemplate(
@@ -58,8 +66,13 @@ export function buildInquiryMessage(
     hostel: contactName,
     name: inquiry.name,
     phone: inquiry.phone,
+    guardian: inquiry.guardianName,
+    guardianPhone: inquiry.guardianPhone,
+    course: inquiry.course,
+    level: inquiry.level,
     room: inquiry.roomName,
     moveIn: inquiry.moveIn,
+    ref: inquiry.ref ?? "",
     note: inquiry.message?.trim()
       ? `${content.chat.notePrefix} ${inquiry.message.trim()}`
       : "",
@@ -74,12 +87,29 @@ export function buildInquiryLink(
   return `https://wa.me/${contact.whatsappNumber}?text=${text}`;
 }
 
+/** The speakable category — "4 in 1", "2 in 1", "1 in 1" — how students
+ *  and managers actually say it. */
+function categoryOf(occupancy: number): string {
+  return `${occupancy} in 1`;
+}
+
+/** Room name → speakable descriptor: category + variant.
+ *  "2 in a room — Old block (No TV)" → "2 in 1 — Old block (No TV)";
+ *  "4 in a room" → "4 in 1". Manager-named rooms that don't follow the
+ *  pattern pass through untouched. */
+export function roomDescriptor(room: RoomType): string {
+  const match = room.name.match(/^[1-4] in a room(?:\s+—\s+(.+))?$/);
+  if (!match) return room.name;
+  const variant = match[1];
+  return variant ? `${categoryOf(room.occupancy)} — ${variant}` : categoryOf(room.occupancy);
+}
+
 export function buildRoomChatLink(
   contact: ChatContact,
   room: RoomType,
 ): string {
   const text = fillTemplate([content.chat.roomGreeting], {
-    room: room.name,
+    room: roomDescriptor(room),
     hostel: contact.name,
   });
   return `https://wa.me/${contact.whatsappNumber}?text=${encodeURIComponent(text)}`;
@@ -87,7 +117,20 @@ export function buildRoomChatLink(
 
 export function buildGeneralChatLink(
   contact: Pick<ChatContact, "whatsappNumber">,
+  rooms?: RoomType[],
 ): string {
-  const text = encodeURIComponent(content.chat.generalGreeting);
-  return `https://wa.me/${contact.whatsappNumber}?text=${text}`;
+  // With room context, the greeting names the categories from the UI —
+  // "your 4 in 1, 2 in 1 and 1 in 1 rooms" — so the manager knows what
+  // the chat is about before it starts.
+  const occupancies = [...new Set((rooms ?? []).map((room) => room.occupancy))].sort((a, b) => b - a);
+  let text: string = content.chat.generalGreeting;
+  if (occupancies.length > 0) {
+    const categories = occupancies.map(categoryOf);
+    const list =
+      categories.length === 1
+        ? categories[0]
+        : `${categories.slice(0, -1).join(", ")} and ${categories[categories.length - 1]}`;
+    text = fillTemplate([content.chat.generalGreetingRooms], { categories: list });
+  }
+  return `https://wa.me/${contact.whatsappNumber}?text=${encodeURIComponent(text)}`;
 }

@@ -3,15 +3,18 @@ import path from "node:path";
 
 const nextConfig: NextConfig = {
   /**
-   * Pin Turbopack's root to this package. The app is its own deployable
-   * (SPEC.md §4 — one build, deployed per hostel) but sits inside a pnpm
-   * workspace folder whose pnpm-workspace.yaml lives outside this git
-   * repo; without this, `next build` warns that it ignored the parent
-   * workspace file. The explicit root keeps resolution local and the
-   * build identical locally and on Vercel.
+   * Pin Turbopack's root to the repo parent so the shared `convex/`
+   * folder (schema + generated API used by this app, SPEC.md §4) is
+   * inside the compilation root. The app is still its own deployable
+   * (one build, deployed per hostel) and the build is identical
+   * locally and on Vercel.
+   *
+   * All imagery is bundled static assets (assets/images.ts, imported by
+   * the per-client shells) — same-origin, content-hashed, optimized by
+   * next/image. No remote image hosts.
    */
   turbopack: {
-    root: path.join(__dirname),
+    root: path.resolve(process.cwd(), ".."),
   },
 };
 

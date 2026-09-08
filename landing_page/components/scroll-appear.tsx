@@ -5,8 +5,8 @@ import { useEffect, useState, type ReactNode } from "react";
 /**
  * Visibility logic for the mobile sticky availability bar (hotel
  * booking-bar pattern). Appears after the visitor scrolls past ~85% of
- * the viewport; hides when the inquiry section is on screen so it never
- * covers the form's submit button. Styling/positioning classes are the
+ * viewport; hides when an #inquire element (the dedicated inquiry page's
+ * form area) is on screen so it never covers the form's submit button. Styling/positioning classes are the
  * direction's (className prop) — this component only toggles visibility.
  *
  * All setState calls happen in async callbacks (rAF / scroll / IO),

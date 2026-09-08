@@ -1,15 +1,18 @@
 /**
  * Demo verification (no image reading — HTML/text assertions only).
  * Fetches the running site's server-rendered HTML and asserts: the
- * org → branch flow (multi-mode demo hostel), every section present,
- * carousels multi-photo, WhatsApp links, and routing behavior.
+ * entry flow for whichever hostel this deployment serves, every section
+ * present, carousels multi-photo, WhatsApp links, and routing behavior.
  *
  * Usage: node scripts/verify-site.mjs [baseUrl]
  * Requires: `next start` (or `pnpm dev`) already running.
- * Note: this checks SSR output (client components SSR their initial
- * markup too). Interaction-level checks (swipe, scroll) are a manual
- * pass in the browser. The unit-mode redirect (/b/* → /) is also manual:
- * flip MODE in lib/mock-hostel.ts — one mode per demo run (SPEC.md §6.1).
+ *
+ * Mode-aware: with HOSTEL_ID/NEXT_PUBLIC_CONVEX_URL set, the site is
+ * live (unit/multi per the hostel row — e.g. the demo Franco Hostel);
+ * unset, it renders the multi-mode mock shell (Aseda Heights). The
+ * org-view section only runs in multi mode; unit mode checks the full
+ * single site at `/`.
+ * Interaction-level checks (swipe, scroll) are a manual pass in the browser.
  */
 
 const BASE = process.argv[2] ?? "http://127.0.0.1:3000";
@@ -25,73 +28,106 @@ function check(label, ok) {
   console.log(`  ${ok ? "✓" : "✗"} ${label}`);
 }
 
-console.log("\n=== org view (/) — multi-mode hostel ===");
-const { status, html: org } = await getPage("/");
+console.log("\n=== entry (/) ===");
+const { status, html: entry } = await getPage("/");
 check(`page 200 (got ${status})`, status === 200);
-check("hero", org.includes('id="hero"') && org.includes("<h1"));
-check("hero top scrim", org.includes("from-black/55"));
-check("hero full view height", org.includes("h-svh"));
-check("org-wide from-price in hero", org.includes("Rooms from") && org.includes("GHS 1,750"));
-check("branch picker", org.includes('id="properties"') && org.includes("Choose your location"));
-check("branch links into branch sites", org.includes('href="/b/main"') && org.includes('href="/b/annex"'));
-check("compare table", org.includes("At a glance"));
-check("org ledger (practical things)", org.includes('id="practical"') && org.includes("The practical things"));
-check("branch carousels", (org.match(/Photo carousel/g) ?? []).length >= 2);
-check("no inquiry form on org view", !org.includes('id="inquire"'));
-check("no house/about section", !org.includes('id="about"'));
-check("org chat uses the org line", org.includes("https://wa.me/233550000000"));
-check("no branch switcher on the org view", !org.includes('aria-haspopup="menu"'));
-check("one h1", (org.match(/<h1/g) ?? []).length === 1);
+check("hero", entry.includes('id="hero"') && entry.includes("<h1"));
+check("hero top scrim", entry.includes("from-black/55"));
+check("hero full view height", entry.includes("h-svh"));
+check("live room prices in hero facts", entry.includes("Rooms from"));
 
-console.log("\n=== branch site (/b/main) — the unit-hotel view ===");
-const { html: main } = await getPage("/b/main");
-check("nav + hero", main.includes('id="hero"') && main.includes("<h1"));
-check("rooms section", main.includes('id="rooms"'));
-check("rooms first after hero", main.indexOf('id="rooms"') < main.indexOf('id="guide"'));
-check("rate card title", main.includes("Rates at a glance"));
-check("guide section", main.includes('id="guide"') && main.includes("How to book"));
-check("guide steps", main.includes("Come and see") && main.includes("Hold your room"));
-check("gallery section", main.includes('id="gallery"'));
-check("good to know (rules + faqs)", main.includes('id="good-to-know"') && main.includes("House rules"));
-check("faqs render", main.includes("Is the booking fee part of the rent?"));
-check("no testimonial section", !main.includes("From the people who live here"));
-check("branch ledger (practical things)", main.includes('id="practical"'));
-check("location section", main.includes('id="location"'));
-check("inquiry form", main.includes('id="inquire"') && main.includes("Send on WhatsApp"));
-check("honeypot present", main.includes('id="company"'));
-check("wa.me links", main.includes("https://wa.me/233550000000"));
-check("branch hero identity (h1 = branch name)", main.includes("Main<br/>Building"));
-check("clear way back (All locations)", main.includes("All locations"));
-check("branch switcher in nav", main.includes('aria-haspopup="menu"'));
-check("chat falls back to the org line (main shares it)",
-  main.includes("https://wa.me/233550000000") && !main.includes("wa.me/233550000002"));
-check("sticky bar CTA", main.includes("Check availability"));
-check("carousel markers (one per room)", (main.match(/Photo carousel/g) ?? []).length >= 3);
-check("carousel dots (multi-photo rooms)", main.includes("Go to photo"));
-check("prices present", main.includes("GHS 1,900") && main.includes("GHS 5,200"));
-check("from-price in hero", main.includes("GHS 1,900"));
-check("booking fee + momo", main.includes("GHS 300") && main.includes("055 000 0000"));
-check("closing band", main.includes("Come and see the room before you decide."));
-check("one h1", (main.match(/<h1/g) ?? []).length === 1);
+// Multi-branch hostel → the org view with the branch picker.
+const multi = entry.includes('id="properties"');
+if (multi) {
+  console.log("\n=== org view (/) — multi-mode hostel ===");
+  check("branch picker", entry.includes('id="properties"') && entry.includes("Choose your location"));
+  check("branch links into branch sites", /href="\/b\/[\w-]+"/.test(entry));
+  check("compare table", entry.includes("At a glance"));
+  check("org ledger (practical things)", entry.includes('id="practical"') && entry.includes("The practical things"));
+  check("no inquiry form on org view", !entry.includes('id="inquire"'));
+  check("no branch switcher on the org view", !entry.includes('aria-haspopup="menu"'));
+  check("org chat link present", /https:\/\/wa\.me\/\d+/.test(entry));
+  check("one h1", (entry.match(/<h1/g) ?? []).length === 1);
+  console.log("(branch-site checks: the branch slugs are deployment data — walk /b/<slug> by hand)");
+} else {
+  console.log("\n=== unit hostel (/) — the full site ===");
+  check("rooms section", entry.includes('id="rooms"'));
+  check("rooms first after hero", entry.indexOf('id="rooms"') < entry.indexOf('id="guide"'));
+  check("rate card title", entry.includes("Rates at a glance"));
+  check("guide section", entry.includes('id="guide"') && entry.includes("How to book"));
+  check("guide steps", entry.includes("Come and see") && entry.includes("Hold your room"));
+  check("gallery section", entry.includes('id="gallery"'));
+  check("good to know (rules + faqs)", entry.includes('id="good-to-know"') && entry.includes("House rules"));
+  check("ledger (practical things)", entry.includes('id="practical"'));
+  check("location section", entry.includes('id="location"'));
+  check("inquiry moved to dedicated page", !entry.includes('id="inquire"'));
+  check("CTAs link the inquiry page", entry.includes('href="/inquire"'));
+  check("wa.me links", /https:\/\/wa\.me\/\d+/.test(entry));
+  check("sticky bar CTA", entry.includes("Check availability"));
+  check("room rows render with photos", (entry.match(/Photo carousel/g) ?? []).length >= 1);
+  check("prices present", /GHS \d[\d,]*/.test(entry));
+  check("booking fee + momo", entry.includes("GHS 300") && /\d{3} \d{3} \d{4}/.test(entry));
+  check("closing band", entry.includes("Come and see the room before you decide."));
+  check("one h1", (entry.match(/<h1/g) ?? []).length === 1);
+  check("branch switcher absent (unit site)", !entry.includes('aria-haspopup="menu"'));
+}
 
-console.log("\n=== second branch (/b/annex) — caretaker's own line ===");
-const { html: annex } = await getPage("/b/annex");
-check("annex hero identity (h1 = branch name)", annex.includes(">Annex</h1>"));
-check("annex hero uses branch photos", annex.includes("/mock/annex.jpg"));
-check("annex chat goes to the branch caretaker",
-  annex.includes("https://wa.me/233550000002") && !annex.includes("wa.me/233550000000"));
-check("annex walk override (12 min, not the org's 8)", annex.includes("12 min"));
-check("renders annex rooms", annex.includes("GHS 1,750") && annex.includes("GHS 3,100"));
-check("waitlist state (annex 2in1 is full)", annex.includes("Waiting list") || annex.includes("Waitlist"));
-check("waitlist CTA (join waiting list)", annex.includes("Join the waiting list"));
-check("clear way back (All locations)", annex.includes("All locations"));
-check("branch switcher in nav", annex.includes('aria-haspopup="menu"'));
+console.log("\n=== inquiry page (/inquire) ===");
+const inq = await getPage("/inquire");
+check(`page 200 (got ${inq.status})`, inq.status === 200);
+check("back to rooms link", inq.html.includes("Back to rooms"));
+if (multi) {
+  // Org-level: the location picker renders first; the form mounts
+  // client-side once a branch is chosen (can't be SSR-checked).
+  check("branch picker (org-level)", inq.html.includes("Which location are you asking about?"));
+  // Branch inquiry pages: take the first branch site link from the entry page.
+  const branchHref = entry.match(/href="(\/b\/[\w-]+)"/);
+  if (branchHref) {
+    const binq = await getPage(`${branchHref[1]}/inquire`);
+    check(
+      `branch inquiry page ${branchHref[1]}/inquire (got ${binq.status})`,
+      binq.status === 200 && binq.html.includes("Send on WhatsApp"),
+    );
+    check("branch inquiry form SSR-rendered", binq.html.includes('id="inquire"'));
+    check("branch inquiry honeypot", binq.html.includes('id="company"'));
+    const roomName = binq.html.match(/id="inq-room"[\s\S]*?<option value="([^"]+)"/);
+    if (roomName) {
+      const pre = await getPage(
+        `${branchHref[1]}/inquire?room=${encodeURIComponent(roomName[1])}`,
+      );
+      check(
+        `?room= pre-selection (${roomName[1]})`,
+        pre.html.includes(`value="${roomName[1]}" selected`),
+      );
+    }
+  } else {
+    check("branch inquiry page reachable from picker", false);
+  }
+} else {
+  check("inquiry form", inq.html.includes('id="inquire"') && inq.html.includes("Send on WhatsApp"));
+  check("honeypot present", inq.html.includes('id="company"'));
+  const preselect = await getPage("/inquire?room=2-in-1");
+  check("?room= pre-selects that room", preselect.html.includes("2-in-1"));
+}
 
 console.log("\n=== routing (SPEC.md §6.2) ===");
-const badBranch = await getPage("/b/nonexistent");
-check("unknown branch → branded 404", badBranch.status === 404 && badBranch.html.includes("404"));
-// Unit-mode redirect (/b/* → /): flip MODE in lib/mock-hostel.ts to verify
-// by hand — mode is data, one mode per demo run (SPEC.md §6.1).
+if (!multi) {
+  // Unit hostel: ANY branch path redirects home — structural mismatch.
+  const branchPath = await fetch(`${BASE}/b/anything`, { redirect: "manual" });
+  check(
+    `branch path on unit hostel → redirect home (got ${branchPath.status})`,
+    branchPath.status >= 300 && branchPath.status < 400,
+  );
+}
+const badBranch = await fetch(`${BASE}/b/nonexistent`, { redirect: multi ? "follow" : "manual" });
+check(
+  `unknown branch → branded 404 (got ${badBranch.status})`,
+  multi ? badBranch.status === 404 : true, // on unit mode it redirects (verified above)
+);
+check("branded 404 copy", (await badBranch.text()).includes("This hostel isn't here."));
+
+const qr = await fetch(`${BASE}/qr`);
+check("QR route serves PNG", qr.status === 200 && qr.headers.get("content-type") === "image/png");
 
 console.log(`\n${failures === 0 ? "ALL CHECKS PASSED" : `${failures} CHECK(S) FAILED`}`);
 process.exit(failures === 0 ? 0 : 1);

@@ -29,7 +29,7 @@ export function OrgLanding({
 }) {
   const totalOpen = branches.reduce((n, b) => n + openRooms(b), 0);
   const allRooms = branches.flatMap((b) => b.rooms);
-  const chatHref = buildGeneralChatLink(orgContact(hostel));
+  const chatHref = buildGeneralChatLink(orgContact(hostel), allRooms);
 
   const navLinks: NavLink[] = [
     { href: "#properties", label: c.nav.locations },
@@ -53,7 +53,7 @@ export function OrgLanding({
       <main>
         {/* The picker is this page's job — it comes first */}
         <PropertiesSection branches={branches} />
-        <Ledger />
+        <Ledger hostel={hostel} />
       </main>
 
       <ClosingFooter hostel={hostel} links={navLinks} ctaHref="#properties" chatHref={chatHref} />

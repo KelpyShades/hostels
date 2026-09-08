@@ -3,16 +3,21 @@
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { buildInquiryLink, type ChatContact } from "@/lib/wa";
-import { content } from "@/lib/content";
+import { academicYears, content } from "@/lib/content";
 import type { RoomType } from "@/lib/mock-hostel";
-import { PRESELECT_ROOM_EVENT } from "@/components/room-cta";
+import { useLiveClient, useLiveRooms } from "@/components/live-data";
+import { api } from "../../convex/_generated/api";
+import type { Id } from "../../convex/_generated/dataModel";
 
 /**
- * Shared inquiry form (SPEC.md FR-A8/A9).
+ * Shared inquiry form (SPEC.md FR-A8/A9) — lives on the dedicated inquiry
+ * page (unit: /inquire, branch: /b/[slug]/inquire).
  * Styled entirely through the direction's CSS variables, so each design
  * skin restyles it without a fork. All copy comes from lib/content.ts.
+ * A room CTA pre-selects its room via the `preselectedRoom` prop
+ * (?room=… on the page URL, FR-A3).
  * Submitting: (1) opens a pre-filled WhatsApp chat to the contact — the
  * branch caretaker on a branch site, the org otherwise;
  * (2) logs the inquiry + receipt email once Convex is wired.
@@ -24,6 +29,11 @@ const t = content.form;
 const inquirySchema = z.object({
   name: z.string().min(2, t.errors.name),
   phone: z.string().min(9, t.errors.phoneShort).max(15, t.errors.phoneLong),
+  email: z.string().email(t.errors.emailInvalid),
+  guardianName: z.string().min(2, t.errors.guardianName),
+  guardianPhone: z.string().min(9, t.errors.phoneShort).max(15, t.errors.phoneLong),
+  course: z.string().min(2, t.errors.course),
+  level: z.string().min(1, t.errors.level),
   roomName: z.string().min(1, t.errors.room),
   moveIn: z.string().min(1, t.errors.moveIn),
   message: z.string().max(500, t.errors.messageLong).optional(),
@@ -36,53 +46,94 @@ type InquiryValues = z.infer<typeof inquirySchema>;
 export function InquiryForm({
   contact,
   rooms,
+  branchId,
   preselectedRoom,
 }: {
   contact: ChatContact;
   rooms: RoomType[];
+  branchId?: string;
   preselectedRoom?: string;
 }) {
+  const liveRooms = useLiveRooms(rooms, branchId);
+  const convex = useLiveClient();
   const [sent, setSent] = useState(false);
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
   } = useForm<InquiryValues>({
     resolver: zodResolver(inquirySchema),
     defaultValues: {
       roomName: preselectedRoom ?? "",
-      moveIn: "",
+      // The next academic year, already chosen (FR-A8): June 2026 →
+      // "2026/2027". Correctable via the select, never blank.
+      moveIn: academicYears(2)[0],
+      email: "",
       company: "",
     },
   });
 
-  // FR-A3: a room's "Check availability" CTA pre-selects that room here.
-  useEffect(() => {
-    const onPreselect = (event: Event) => {
-      const roomName = (event as CustomEvent<{ roomName: string }>).detail?.roomName;
-      if (roomName) setValue("roomName", roomName, { shouldValidate: false });
-    };
-    window.addEventListener(PRESELECT_ROOM_EVENT, onPreselect);
-    return () => window.removeEventListener(PRESELECT_ROOM_EVENT, onPreselect);
-  }, [setValue]);
+  // FR-A3: a room's "Check availability" CTA lands here with ?room=… —
+  // the page passes it through as `preselectedRoom`.
 
-  const onSubmit = (values: InquiryValues) => {
+  const onSubmit = async (values: InquiryValues) => {
     // Honeypot filled → silently drop (pretend success, open nothing).
     if (values.company) {
       setSent(true);
       return;
     }
-    const link = buildInquiryLink(contact, {
+    // Open a blank tab synchronously inside the user gesture — mobile
+    // Safari blocks window.open after an await — then log the inquiry
+    // (the mutation returns the reference, FRANCO-2026-E001) and navigate
+    // the held tab to WhatsApp with the reference already in the message.
+    const draft = {
       name: values.name,
       phone: values.phone,
+      guardianName: values.guardianName,
+      guardianPhone: values.guardianPhone,
+      course: values.course,
+      level: values.level,
       roomName: values.roomName,
       moveIn: values.moveIn,
       message: values.message,
+    };
+    const needsRef = Boolean(convex && branchId);
+    const held = needsRef ? window.open("", "_blank") : null;
+
+    let ref: string | null = null;
+    if (convex && branchId) {
+      try {
+        const result = await convex.client.mutation(api.public.submitInquiry, {
+          hostelId: convex.hostelId as Id<"hostels">,
+          branchId: branchId as Id<"branches">,
+          name: values.name,
+          phone: values.phone,
+          email: values.email,
+          guardianName: values.guardianName,
+          guardianPhone: values.guardianPhone,
+          course: values.course,
+          level: values.level,
+          roomName: values.roomName,
+          moveInDate: values.moveIn,
+          message: values.message,
+          company: values.company ?? "",
+        });
+        ref = result?.ref ?? null;
+      } catch {
+        ref = null;
+      }
+    }
+
+    const link = buildInquiryLink(contact, {
+      ...draft,
+      ...(ref ? { ref } : {}),
     });
-    window.open(link, "_blank", "noopener");
+    if (held && !held.closed) {
+      held.location.href = link;
+    } else {
+      window.open(link, "_blank", "noopener");
+    }
     setSent(true);
-    // TODO(Convex wiring): log inquiry + send Pingram receipt email.
   };
 
   const inputClass =
@@ -140,30 +191,99 @@ export function InquiryForm({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="inq-room" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
-            {t.roomType}
+          <label htmlFor="inq-email" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
+            {t.email}
           </label>
-          <select id="inq-room" className={inputClass} {...register("roomName")}>
-            <option value="">{t.chooseRoom}</option>
-            {rooms.map((room) => (
-              <option key={room.id} value={room.name}>
-                {room.name} — GHS {room.pricePerSemester.toLocaleString("en-GH")}/sem
+          <input
+            id="inq-email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder={t.emailPlaceholder}
+            className={inputClass}
+            {...register("email")}
+          />
+          {errors.email && (
+            <p className="mt-1.5 text-[13px] text-(--error)">{errors.email.message}</p>
+          )}
+        </div>
+        <div>
+          <label htmlFor="inq-course" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
+            {t.course}
+          </label>
+          <input
+            id="inq-course"
+            type="text"
+            placeholder={t.coursePlaceholder}
+            className={inputClass}
+            {...register("course")}
+          />
+          {errors.course && (
+            <p className="mt-1.5 text-[13px] text-(--error)">{errors.course.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="inq-guardian-name" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
+            {t.guardianName}
+          </label>
+          <input
+            id="inq-guardian-name"
+            type="text"
+            autoComplete="off"
+            placeholder={t.guardianNamePlaceholder}
+            className={inputClass}
+            {...register("guardianName")}
+          />
+          {errors.guardianName && (
+            <p className="mt-1.5 text-[13px] text-(--error)">{errors.guardianName.message}</p>
+          )}
+        </div>
+        <div>
+          <label htmlFor="inq-guardian-phone" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
+            {t.guardianPhone}
+          </label>
+          <input
+            id="inq-guardian-phone"
+            type="tel"
+            inputMode="tel"
+            placeholder={t.phonePlaceholder}
+            className={inputClass}
+            {...register("guardianPhone")}
+          />
+          {errors.guardianPhone && (
+            <p className="mt-1.5 text-[13px] text-(--error)">{errors.guardianPhone.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="inq-level" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
+            {t.level}
+          </label>
+          <select id="inq-level" className={inputClass} {...register("level")}>
+            <option value="">{t.level}</option>
+            {t.levelOptions.map((option) => (
+              <option key={option} value={option}>
+                {option}
               </option>
             ))}
           </select>
-          {errors.roomName && (
-            <p className="mt-1.5 text-[13px] text-(--error)">{errors.roomName.message}</p>
+          {errors.level && (
+            <p className="mt-1.5 text-[13px] text-(--error)">{errors.level.message}</p>
           )}
         </div>
         <div>
           <label htmlFor="inq-movein" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
-            {t.moveIn}
+            {t.academicYear}
           </label>
           <select id="inq-movein" className={inputClass} {...register("moveIn")}>
-            <option value="">{t.whichSemester}</option>
-            {content.chat.semesters.map((s) => (
-              <option key={s} value={s}>
-                {s}
+            {academicYears(2).map((year) => (
+              <option key={year} value={year}>
+                {year}
               </option>
             ))}
           </select>
@@ -171,6 +291,28 @@ export function InquiryForm({
             <p className="mt-1.5 text-[13px] text-(--error)">{errors.moveIn.message}</p>
           )}
         </div>
+      </div>
+
+      <div>
+        <label htmlFor="inq-room" className="mb-1.5 block text-[13px] font-medium text-(--ink)">
+          {t.roomType}
+        </label>
+        <select
+          id="inq-room"
+          className={inputClass}
+          defaultValue={preselectedRoom ?? ""}
+          {...register("roomName")}
+        >
+          <option value="">{t.chooseRoom}</option>
+          {liveRooms.map((room) => (
+            <option key={room.id} value={room.name}>
+              {room.name} — GHS {room.pricePerYear.toLocaleString("en-GH")}/yr
+            </option>
+          ))}
+        </select>
+        {errors.roomName && (
+          <p className="mt-1.5 text-[13px] text-(--error)">{errors.roomName.message}</p>
+        )}
       </div>
 
       <div>

@@ -80,12 +80,14 @@ export function ClosingFooter({
             <p>
               {c.booking.payVia}: {hostel.momoName}, {hostel.momoNumber}
             </p>
-            <p className="mt-2">
-              {c.booking.feeLabel}: {formatGhs(hostel.bookingFee)}
-            </p>
+            {hostel.bookingFee ? (
+              <p className="mt-2">
+                {c.booking.feeLabel}: {formatGhs(hostel.bookingFee)}
+              </p>
+            ) : null}
           </div>
         </div>
-        <p className="border-t border-white/10 py-7 text-center text-[12.5px] text-(--deep-ink)/55">
+        <p className="border-t border-white/10 py-7 pb-20 text-center text-[12.5px] text-(--deep-ink)/55">
           © {new Date().getFullYear()} {hostel.name}
         </p>
       </div>
