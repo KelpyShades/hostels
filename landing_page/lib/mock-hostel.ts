@@ -137,7 +137,7 @@ export const asedaHeights: Hostel = {
   area: "KNUST, Kumasi",
   city: "Kumasi",
   walkToCampus: "8 min",
-  whatsappNumber: "233550000000", // DEMO — the org line; branches can override with their caretaker's (SPEC.md §5)
+  whatsappNumber: "233270088802", // DEMO — the org line; branches can override with their caretaker's (SPEC.md §5)
   momoName: "Aseda Heights",
   momoNumber: "055 000 0000",
   bookingFee: 300,
@@ -322,7 +322,7 @@ export const annexLocation: Branch = {
   slug: "annex",
   name: "Aseda Heights — Annex",
   directionsNote: "Past the junction, 12 min walk from the main gate",
-  whatsappNumber: "233550000002", // DEMO — the Annex caretaker's own line
+  whatsappNumber: "233270088802", // DEMO — the Annex caretaker's own line
   walkToCampus: "12 min",
   photos: [{ src: img.annex.src, caption: "The Annex, from the street" }],
   rooms: [

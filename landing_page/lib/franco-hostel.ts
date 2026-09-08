@@ -160,7 +160,7 @@ export const francoMain: Branch = {
   slug: "main",
   name: "Main",
   directionsNote: "Fiapre, Sunyani — a 20-minute walk from the UENR campus",
-  whatsappNumber: "233550000010", // TODO(client): the Main caretaker's real line
+  whatsappNumber: "233270088802", // TODO(client): the Main caretaker's real line
   photos: [{ src: img.exterior.src, caption: "The Main building" }],
   rooms: [],
 };
@@ -171,7 +171,7 @@ function annexBranch(n: 1 | 2 | 3): Branch {
     slug: `annex-${n}`,
     name: `Annex ${n}`,
     directionsNote: "Fiapre, Sunyani — a short walk from the Main building",
-    whatsappNumber: `23355000001${n}`, // TODO(client): this annex caretaker's real line
+    whatsappNumber: `233270088802`, // TODO(client): this annex caretaker's real line
     photos: [{ src: img.annex.src, caption: `Annex ${n}` }],
     rooms: [],
   };

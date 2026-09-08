@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
+    "@opennextjs/cloudflare": "^1.20.6",
     "convex": "^1.45.0",
     "convex-helpers": "^0.1.124",
     "next": "16.3.4",
@@ -29,7 +30,8 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.129.1"
   },
   "packageManager": "pnpm@11.3.0"
 }
