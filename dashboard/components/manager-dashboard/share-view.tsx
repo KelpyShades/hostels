@@ -18,8 +18,16 @@ import type { ManagerBranch } from "./types";
  * Generated in the browser from NEXT_PUBLIC_SITE_URL — no server needed.
  */
 
+/**
+ * Temporary base domain (the Franco Hostel landing page) used until each
+ * hostel gets its own NEXT_PUBLIC_SITE_URL. Managers still see the
+ * "hasn't been set up yet" notice so they know to ask for their own address.
+ */
+const FALLBACK_SITE_URL = "https://franco-hostel.vercel.app";
+
 export function ShareView({ branch }: { branch?: ManagerBranch }) {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const configuredSiteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  const siteUrl = configuredSiteUrl || FALLBACK_SITE_URL;
   const targetUrl = siteUrl && branch ? `${siteUrl}/b/${slugify(branch.name)}` : siteUrl;
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
@@ -59,6 +67,11 @@ export function ShareView({ branch }: { branch?: ManagerBranch }) {
 
   return (
     <div className="space-y-6">
+      {!configuredSiteUrl && (
+        <div className="rounded-xl border border-dashed p-4 text-center">
+          <p className="text-sm text-muted-foreground">{content.share.notConfigured}</p>
+        </div>
+      )}
       <div className="rounded-xl border bg-card p-5 shadow-sm sm:p-6">
         <p className="text-[13px] font-medium text-muted-foreground">
           {branch ? `${branch.name} — on your website` : "Your website"}

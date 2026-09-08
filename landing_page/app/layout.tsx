@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Instrument_Sans } from "next/font/google";
 import "./globals.css";
 import { getSite } from "@/lib/site-data";
-import { metaDescription, publicConfig } from "@/lib/live";
+import { metaDescription, publicConfig, siteUrl } from "@/lib/live";
 import { SiteDataProvider } from "@/components/live-data";
 
 /**
@@ -42,6 +42,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     title,
     description,
+    metadataBase: new URL(siteUrl()),
     openGraph: {
       title,
       description,

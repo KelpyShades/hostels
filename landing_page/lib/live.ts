@@ -37,6 +37,15 @@ export function publicConfig(): { hostelId: string; convexUrl: string } | null {
   return hostelId && convexUrl ? { hostelId, convexUrl } : null;
 }
 
+/**
+ * The public address of this deployment (SPEC.md §6.1): the hostel's own
+ * domain when NEXT_PUBLIC_SITE_URL is set; for now, the shared base
+ * deployment until each hostel has its own address.
+ */
+export function siteUrl(): string {
+  return process.env.NEXT_PUBLIC_SITE_URL || "https://franco-hostel.vercel.app";
+}
+
 /** Stable branch slug from a branch name — /b/[branch] routing for
  *  branches created in the dashboard (SPEC.md §6.1). */
 export function slugify(name: string): string {
