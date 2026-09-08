@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
    * the per-client shells) — same-origin, content-hashed, optimized by
    * next/image. No remote image hosts.
    */
+  transpilePackages: ["convex"], 
   turbopack: {
     root: path.resolve(process.cwd(), ".."),
   },

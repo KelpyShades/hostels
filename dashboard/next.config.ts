@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
    * folder (schema + generated API used by this app, SPEC.md §4) is
    * inside the compilation root.
    */
+  transpilePackages: ["convex"], 
   turbopack: {
     root: path.resolve(process.cwd(), ".."),
   },
