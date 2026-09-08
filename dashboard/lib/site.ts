@@ -22,6 +22,15 @@ export const getHostelName = cache(async (): Promise<string | null> => {
     );
     return live?.hostel.name ?? null;
   } catch (error) {
+    // Next's signal that this route must render on-demand — rethrow it so
+    // the router marks the route dynamic instead of logging a scary error
+    // and prerendering fallback data.
+    if (
+      error instanceof Error &&
+      (error as Error & { digest?: string }).digest === "DYNAMIC_SERVER_USAGE"
+    ) {
+      throw error;
+    }
     console.error("Convex public data unavailable:", error);
     return null;
   }
