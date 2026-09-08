@@ -127,12 +127,15 @@ import { siteStats } from "@/lib/live";
 export const alt = "Rooms, prices and availability";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+// Live Convex data — must render per-request, not at build time.
+export const dynamic = "force-dynamic";
 
 // Helper to fetch font array buffer safely over the network
 async function loadGoogleFont(font: string, weight: number) {
-  const url = `https://googleapis.com/${font}:wght@${weight}`;
+  const url = `https://fonts.googleapis.com/css2?family=${font}:wght@${weight}&display=swap`;
   const css = await fetch(url).then((res) => res.text());
-  const resource = css.match(/src: url\((.+?)\) format\('(ttf|woff2)'\)/);
+  // Node's fetch gets no-UA CSS (`format('truetype')`); browsers get woff2.
+  const resource = css.match(/src: url\((.+?)\) format\('(?:truetype|woff2?|ttf)'\)/);
   if (!resource) throw new Error("Failed to parse font from Google Fonts");
   return await fetch(resource[1]).then((res) => res.arrayBuffer());
 }

@@ -32,6 +32,9 @@ importers:
       react-hook-form:
         specifier: ^7.87.0
         version: 7.87.0(react@19.2.8)
+      sequenzy:
+        specifier: ^2.0.0
+        version: 2.0.0
       zod:
         specifier: ^4.5.4
         version: 4.5.4
@@ -2163,6 +2166,9 @@ packages:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
     engines: {node: '>=10'}
     hasBin: true
+
+  sequenzy@2.0.0:
+    resolution: {integrity: sha512-wnTpW95snQCW1Kgq6tZOKkbXZIaLouASjxtScwWs/mb+UzMubcvxoWxoKIQUruvbV9NYyojhQFWt2nOKK1ctcw==}
 
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
@@ -4456,6 +4462,8 @@ snapshots:
   semver@6.3.1: {}
 
   semver@7.8.5: {}
+
+  sequenzy@2.0.0: {}
 
   set-blocking@2.0.0: {}
 
