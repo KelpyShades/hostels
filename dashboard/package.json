@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/link-convex-node-modules.mjs && next dev",
+    "build": "node scripts/link-convex-node-modules.mjs && next build",
     "start": "next start",
     "lint": "eslint"
   },
@@ -25,6 +25,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.87.0",
+    "sequenzy": "^2.0.0",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0",
